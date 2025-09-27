@@ -1,0 +1,84 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: wavesens
+      POSTGRES_USER: wavesens
+      POSTGRES_PASSWORD: password123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./news_analyzer/schema.sql:/docker-entrypoint-initdb.d/01-news_analyzer.sql
+      - ./signal_extractor/schema.sql:/docker-entrypoint-initdb.d/02-signal_extractor.sql
+      - ./experiment_manager/schema.sql:/docker-entrypoint-initdb.d/03-experiment_manager.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wavesens"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://wavesens:password123@postgres:5432/wavesens
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  news_analyzer:
+    build: ./news_analyzer
+    environment:
+      DATABASE_URL: postgresql://wavesens:password123@postgres:5432/wavesens
+      FINNHUB_API_KEY: d367tv1r01qumnp4iltgd367tv1r01qumnp4ilu0
+      OPENROUTER_API_KEY: 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
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  signal_extractor:
+    build: ./signal_extractor
+    environment:
+      DATABASE_URL: postgresql://wavesens:password123@postgres:5432/wavesens
+      OPENROUTER_API_KEY: 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
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  experiment_manager:
+    build: ./experiment_manager
+    environment:
+      DATABASE_URL: postgresql://wavesens:password123@postgres:5432/wavesens
+      ALPHA_VANTAGE_API_KEY: your_alpha_vantage_key_here
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        REACT_APP_API_URL: http://localhost:8000
+        REACT_APP_WS_URL: ws://localhost:8000/ws
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
