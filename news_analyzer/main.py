@@ -41,6 +41,22 @@ class NewsAnalyzerService:
         signal.signal(signal.SIGINT, self.shutdown)
         signal.signal(signal.SIGTERM, self.shutdown)
 
+    def is_market_open(self):
+        """Проверка открытости рынков (пн-пт 9:30-16:00 EST)"""
+        from zoneinfo import ZoneInfo
+        ny_tz = ZoneInfo('America/New_York')
+        now = datetime.now(ny_tz)
+
+        # Выходные - рынок закрыт
+        if now.weekday() >= 5:  # Суббота = 5, Воскресенье = 6
+            return False
+
+        # Проверка времени (9:30 - 16:00 EST) с буфером
+        market_open = now.replace(hour=9, minute=0, second=0, microsecond=0)
+        market_close = now.replace(hour=16, minute=30, second=0, microsecond=0)
+
+        return market_open <= now <= market_close
+
     def shutdown(self, signum, frame):
         """Graceful shutdown"""
         logger.info("Shutting down (SIGINT received)")
@@ -148,6 +164,7 @@ class NewsAnalyzerService:
         logger.info(f"Config: threshold={self.config.SIGNIFICANCE_THRESHOLD}, interval={self.config.CHECK_INTERVAL_SECONDS}s, model={self.config.LLM_MODEL}")
 
         last_hourly_log = datetime.now()
+        last_market_check = datetime.now()
 
         while self.running:
             try:
@@ -156,7 +173,23 @@ class NewsAnalyzerService:
                     self.log_hourly_stats()
                     last_hourly_log = datetime.now()
 
-                # Основная работа
+                # Проверяем состояние рынка каждые 5 минут
+                if datetime.now() - last_market_check >= timedelta(minutes=5):
+                    if not self.is_market_open():
+                        from zoneinfo import ZoneInfo
+                        ny_tz = ZoneInfo('America/New_York')
+                        now = datetime.now(ny_tz)
+                        if now.weekday() >= 5:
+                            logger.info(f"🔴 Market closed: Weekend. Sleeping for 1 hour to save tokens...")
+                            time.sleep(3600)  # Спим час в выходные
+                        else:
+                            logger.info(f"🔴 Market closed: Outside trading hours ({now.strftime('%H:%M')} EST). Sleeping for 30 min...")
+                            time.sleep(1800)  # Спим 30 минут в нерабочее время
+                        last_market_check = datetime.now()
+                        continue
+                    last_market_check = datetime.now()
+
+                # Основная работа только когда рынок открыт
                 logger.debug("Fetching news from Finnhub...")
                 news_items = self.fetch_finnhub_news()
                 self.stats['checks'] += 1
