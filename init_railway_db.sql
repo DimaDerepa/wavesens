@@ -54,6 +54,22 @@ CREATE TABLE IF NOT EXISTS experiments (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Portfolio snapshots table for portfolio tracking
+CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+    id SERIAL PRIMARY KEY,
+    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() UNIQUE,
+    total_value DECIMAL(12,2) NOT NULL,
+    cash_balance DECIMAL(12,2) NOT NULL,
+    positions_count INTEGER DEFAULT 0,
+    unrealized_pnl DECIMAL(12,2) DEFAULT 0,
+    realized_pnl_today DECIMAL(12,2) DEFAULT 0,
+    realized_pnl_total DECIMAL(12,2) DEFAULT 0,
+    daily_return DECIMAL(8,4) DEFAULT 0,
+    total_return DECIMAL(8,4) DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_timestamp ON portfolio_snapshots(timestamp);
+
 CREATE TABLE IF NOT EXISTS trades (
     id SERIAL PRIMARY KEY,
     experiment_id INTEGER REFERENCES experiments(id),
