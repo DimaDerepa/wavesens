@@ -1,0 +1,19 @@
+[build]
+provider = "node"
+
+[phases.setup]
+nixPkgs = ['nodejs-18_x', 'npm-9_x']
+
+[phases.install]
+dependsOn = ['setup']
+cmds = ['npm ci']
+
+[phases.build]
+dependsOn = ['install']
+cmds = ['npm run build']
+
+[start]
+cmd = 'npx serve -s build -l 3000'
+
+[variables]
+NODE_ENV = 'production'
