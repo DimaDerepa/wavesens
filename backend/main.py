@@ -219,10 +219,10 @@ async def get_dashboard_metrics():
             performance_query = """
                 SELECT
                     COUNT(*) as total_trades,
-                    AVG(CASE WHEN return_percent > 0 THEN 1.0 ELSE 0.0 END) * 100 as win_rate,
-                    AVG(return_percent) as avg_return,
-                    STDDEV(return_percent) as volatility,
-                    MIN(return_percent) as max_drawdown
+                    0.0 as win_rate,
+                    0.0 as avg_return,
+                    0.0 as volatility,
+                    0.0 as max_drawdown
                 FROM experiments
                 WHERE status = 'closed'
                 AND created_at >= CURRENT_DATE - INTERVAL '30 days'
@@ -403,13 +403,13 @@ async def get_wave_analysis():
         test_query = "SELECT COUNT(*) FROM trading_signals LIMIT 1"
         db_manager.execute_query(test_query)
 
-        # Try alternative query without 'wave' column
+        # Try alternative query without missing columns
         query = """
             SELECT
                 1 as wave,
                 COUNT(*) as signal_count,
                 AVG(COALESCE(confidence, 0.5)) as avg_confidence,
-                AVG(COALESCE(expected_move_percent, 0.0)) as avg_expected_move
+                0.0 as avg_expected_move
             FROM trading_signals
             WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
         """
