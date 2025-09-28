@@ -763,6 +763,36 @@ async def get_database_tables():
         logger.error(f"Failed to get tables: {e}")
         return {"error": str(e), "tables": []}
 
+@app.get("/api/debug/table-structure/{table_name}")
+async def get_table_structure(table_name: str):
+    """Debug endpoint to see table columns"""
+    try:
+        columns = db_manager.execute_query("""
+            SELECT column_name, data_type, is_nullable
+            FROM information_schema.columns
+            WHERE table_name = %s AND table_schema = 'public'
+            ORDER BY ordinal_position
+        """, (table_name,))
+
+        # Get recent records to see actual data
+        recent_data = []
+        try:
+            recent_data = db_manager.execute_query(f"SELECT * FROM {table_name} ORDER BY COALESCE(created_at, processed_at) DESC LIMIT 3")
+        except:
+            try:
+                recent_data = db_manager.execute_query(f"SELECT * FROM {table_name} LIMIT 3")
+            except:
+                pass
+
+        return {
+            "table": table_name,
+            "columns": columns,
+            "recent_data": recent_data
+        }
+    except Exception as e:
+        logger.error(f"Failed to get table structure: {e}")
+        return {"error": str(e), "table": table_name}
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
