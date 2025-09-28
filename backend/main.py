@@ -184,6 +184,15 @@ async def clear_fake_logs():
     except Exception as e:
         return {"error": str(e)}
 
+@app.post("/api/debug/clear-all-logs")
+async def clear_all_logs():
+    """Clear ALL logs from database - DANGEROUS"""
+    try:
+        result = db_manager.execute_query("DELETE FROM application_logs")
+        return {"message": "All logs cleared", "deleted": result}
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/api/system/railway-logs")
 async def get_railway_logs():
     """Get logs directly from Railway using API"""
