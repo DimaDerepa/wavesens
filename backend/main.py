@@ -748,6 +748,21 @@ async def change_model(model_data: dict):
     model_id = model_data.get("model_id")
     return {"success": True, "new_model": model_id}
 
+@app.get("/api/debug/tables")
+async def get_database_tables():
+    """Debug endpoint to see available tables"""
+    try:
+        tables = db_manager.execute_query("""
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = 'public'
+            ORDER BY table_name
+        """)
+        return {"tables": [t['table_name'] for t in tables]}
+    except Exception as e:
+        logger.error(f"Failed to get tables: {e}")
+        return {"error": str(e), "tables": []}
+
 # Health check endpoint
 @app.get("/health")
 async def health_check():
