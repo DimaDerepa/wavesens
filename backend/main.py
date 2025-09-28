@@ -387,13 +387,13 @@ async def get_active_signals():
 @app.get("/api/experiments")
 async def get_experiments(limit: int = Query(50, le=100)):
     """Get recent experiments"""
-    query = "SELECT * FROM experiments ORDER BY entry_time DESC LIMIT %s"
+    query = "SELECT * FROM experiments ORDER BY created_at DESC LIMIT %s"
     return db_manager.execute_query(query, (limit,))
 
 @app.get("/api/experiments/active")
 async def get_active_experiments():
     """Get active experiments"""
-    query = "SELECT * FROM experiments WHERE status = 'active' ORDER BY entry_time DESC"
+    query = "SELECT * FROM experiments WHERE status = 'active' ORDER BY created_at DESC"
     return db_manager.execute_query(query)
 
 @app.get("/api/experiments/closed")
@@ -618,12 +618,12 @@ async def get_system_logs():
         # Experiment manager logs
         try:
             recent_experiments = db_manager.execute_query(
-                "SELECT * FROM experiments ORDER BY entry_time DESC LIMIT 3"
+                "SELECT * FROM experiments ORDER BY created_at DESC LIMIT 3"
             )
             if recent_experiments:
                 for exp in recent_experiments:
                     logs["experiment_manager"].append({
-                        "timestamp": exp.get('entry_time', datetime.now()).isoformat(),
+                        "timestamp": exp.get('created_at', datetime.now()).isoformat(),
                         "level": "INFO",
                         "message": f"Started experiment {exp.get('id', 'unknown')[:8]}: {exp.get('action', 'UNKNOWN')} {exp.get('ticker', 'UNKNOWN')}"
                     })
