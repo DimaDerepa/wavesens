@@ -13,7 +13,7 @@ const Dashboard: React.FC = () => {
   const [portfolioData, setPortfolioData] = useState<any[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<string>('DISCONNECTED');
   const [waveAnalysis, setWaveAnalysis] = useState<any>(null);
-  const [systemLogs, setSystemLogs] = useState<any>(null);
+  const [realLogs, setRealLogs] = useState<any>(null);
   const [tokenUsage, setTokenUsage] = useState<any>(null);
   const [isWeekend, setIsWeekend] = useState(false);
 
@@ -46,18 +46,18 @@ const Dashboard: React.FC = () => {
     try {
       console.log('📊 Loading dashboard data...');
       setLoading(true);
-      const [dashboardMetrics, portfolioSnapshots, waveData, logsData, tokensData] = await Promise.all([
+      const [dashboardMetrics, portfolioSnapshots, waveData, tokensData, realLogsData] = await Promise.all([
         apiService.getDashboardMetrics(),
         apiService.getPortfolioSnapshots(24),
         apiService.getWaveAnalysis(),
-        apiService.getSystemLogs(),
-        apiService.getTokenUsage()
+        apiService.getTokenUsage(),
+        apiService.getSystemLogs()
       ]);
 
       setMetrics(dashboardMetrics);
       setWaveAnalysis(waveData);
-      setSystemLogs(logsData);
       setTokenUsage(tokensData);
+      setRealLogs(realLogsData);
       setPortfolioData(portfolioSnapshots.map(snap => ({
         time: new Date(snap.timestamp).toLocaleTimeString(),
         portfolio: snap.total_value,
@@ -431,40 +431,83 @@ const Dashboard: React.FC = () => {
           </Card>
         </div>
 
-        {/* Service Logs */}
+        {/* Real Service Logs */}
         <div style={{ marginTop: '2rem' }}>
-          <Card title="Service Logs" loading={loading}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-              {systemLogs && Object.entries(systemLogs).map(([service, logs]: [string, any]) => (
-                <div key={service}>
-                  <h4 style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', textTransform: 'capitalize' }}>
-                    {service.replace('_', ' ')}
-                  </h4>
-                  <div style={{
-                    maxHeight: '200px',
-                    overflowY: 'auto',
-                    backgroundColor: '#1f2937',
-                    color: '#f3f4f6',
-                    padding: '0.75rem',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.75rem',
-                    fontFamily: 'monospace'
-                  }}>
-                    {logs.map((log: any, index: number) => (
-                      <div key={index} style={{ marginBottom: '0.25rem' }}>
-                        <span style={{ color: log.level === 'ERROR' ? '#f87171' : log.level === 'WARN' ? '#fbbf24' : '#34d399' }}>
-                          [{log.level}]
-                        </span>
-                        <span style={{ color: '#9ca3af', marginLeft: '0.5rem' }}>
-                          {new Date(log.timestamp).toLocaleTimeString()}
-                        </span>
-                        <div style={{ marginLeft: '1rem' }}>{log.message}</div>
-                      </div>
-                    ))}
+          <Card title="Real Service Logs" loading={loading}>
+            {realLogs ? (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '1.5rem' }}>
+                {Object.entries(realLogs).map(([service, logs]: [string, any]) => (
+                  <div key={service}>
+                    <h4 style={{
+                      fontSize: '0.875rem',
+                      fontWeight: '600',
+                      marginBottom: '0.75rem',
+                      textTransform: 'capitalize',
+                      color: '#374151'
+                    }}>
+                      {service.replace('_', ' ')}
+                    </h4>
+                    <div style={{
+                      maxHeight: '300px',
+                      overflowY: 'auto',
+                      backgroundColor: '#1f2937',
+                      border: '1px solid #374151',
+                      borderRadius: '0.5rem',
+                      padding: '1rem',
+                      fontSize: '0.75rem',
+                      fontFamily: 'Monaco, Consolas, "Courier New", monospace'
+                    }}>
+                      {logs && logs.length > 0 ? (
+                        logs.slice(0, 15).map((log: any, index: number) => (
+                          <div key={index} style={{
+                            marginBottom: '0.5rem',
+                            lineHeight: '1.3',
+                            color: '#e5e7eb'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                              <span style={{
+                                color: log.level === 'ERROR' ? '#f87171' :
+                                       log.level === 'WARN' ? '#fbbf24' :
+                                       log.level === 'INFO' ? '#34d399' : '#60a5fa',
+                                fontWeight: '600'
+                              }}>
+                                [{log.level}]
+                              </span>
+                              <span style={{ color: '#9ca3af', fontSize: '0.7rem' }}>
+                                {new Date(log.timestamp).toLocaleTimeString()}
+                              </span>
+                            </div>
+                            <div style={{
+                              marginTop: '0.25rem',
+                              paddingLeft: '0.5rem',
+                              borderLeft: '2px solid #374151',
+                              color: '#f3f4f6',
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word'
+                            }}>
+                              {log.message}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{
+                          color: '#9ca3af',
+                          textAlign: 'center',
+                          padding: '2rem',
+                          fontStyle: 'italic'
+                        }}>
+                          No recent logs available
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#6b7280' }}>
+                Loading real service logs...
+              </div>
+            )}
           </Card>
         </div>
       </div>
