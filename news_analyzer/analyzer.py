@@ -28,29 +28,6 @@ class NewsAnalyzer:
             import litellm
             litellm.drop_params = True
             litellm.turn_off_message_logging = True
-            # Принудительно отключаем все proxy параметры
-            import os
-            if 'HTTP_PROXY' in os.environ:
-                del os.environ['HTTP_PROXY']
-            if 'HTTPS_PROXY' in os.environ:
-                del os.environ['HTTPS_PROXY']
-            if 'http_proxy' in os.environ:
-                del os.environ['http_proxy']
-            if 'https_proxy' in os.environ:
-                del os.environ['https_proxy']
-        except:
-            pass
-
-        try:
-            # Patch httpx client creation to ignore proxies
-            import httpx
-            original_client_init = httpx.Client.__init__
-            def patched_client_init(self, **kwargs):
-                # Remove proxy-related kwargs
-                kwargs.pop('proxies', None)
-                kwargs.pop('proxy', None)
-                return original_client_init(self, **kwargs)
-            httpx.Client.__init__ = patched_client_init
         except:
             pass
 
