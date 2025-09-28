@@ -52,6 +52,16 @@ class Config:
             datefmt='%Y-%m-%d %H:%M:%S'
         )
 
+        # Add database logging to capture all real logs
+        try:
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from shared_logging import setup_database_logging
+            setup_database_logging("signal_extractor")
+        except Exception as e:
+            print(f"Could not setup database logging: {e}")
+
     def get_wave_info(self, minutes_old):
         """Определяет статус волн на основе возраста новости"""
         wave_status = {}

@@ -58,6 +58,16 @@ class Config:
             datefmt='%Y-%m-%d %H:%M:%S'
         )
 
+        # Add database logging to capture all real logs
+        try:
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from shared_logging import setup_database_logging
+            setup_database_logging("experiment_manager")
+        except Exception as e:
+            print(f"Could not setup database logging: {e}")
+
         # Валидация параметров
         if self.INITIAL_CAPITAL <= 0:
             raise ValueError("INITIAL_CAPITAL must be positive")
