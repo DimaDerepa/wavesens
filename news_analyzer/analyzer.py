@@ -20,10 +20,12 @@ class NewsSignificanceSignature(dspy.Signature):
 class NewsAnalyzer:
     def __init__(self, openrouter_api_key, model_name, temperature):
         # Настройка OpenRouter через DSPy
+        import os
+        os.environ['OPENROUTER_API_KEY'] = openrouter_api_key
+
         self.lm = dspy.LM(
             model=f"openrouter/{model_name}",
             api_key=openrouter_api_key,
-            api_base="https://openrouter.ai/api/v1",
             temperature=temperature
         )
         dspy.settings.configure(lm=self.lm)

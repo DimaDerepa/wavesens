@@ -21,6 +21,33 @@ class NewsStorage:
             self.conn = psycopg2.connect(self.database_url)
             self.conn.autocommit = True
             logger.info("Database connected")
+
+            # Создаем таблицу news_items если её нет
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS news_items (
+                    id SERIAL PRIMARY KEY,
+                    news_id VARCHAR(255) UNIQUE NOT NULL,
+                    headline TEXT NOT NULL,
+                    summary TEXT,
+                    url VARCHAR(500),
+                    published_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    significance_score DECIMAL(3,2),
+                    reasoning TEXT,
+                    is_significant BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_news_items_news_id ON news_items(news_id)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_news_items_is_significant ON news_items(is_significant)
+            """)
+            cursor.close()
+            logger.info("News items table initialized")
+
         except Exception as e:
             logger.error(f"Database connection failed: {e}")
             raise
@@ -29,7 +56,7 @@ class NewsStorage:
         """Проверка дубликата"""
         try:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT 1 FROM news WHERE id = %s", (news_id,))
+            cursor.execute("SELECT 1 FROM news_items WHERE news_id = %s", (news_id,))
             return cursor.fetchone() is not None
         except Exception as e:
             logger.error(f"Duplicate check failed: {e}")
@@ -41,7 +68,7 @@ class NewsStorage:
         try:
             cursor = self.conn.cursor()
             cursor.execute("""
-                INSERT INTO news (id, headline, summary, url, published_at,
+                INSERT INTO news_items (news_id, headline, summary, url, published_at,
                                 significance_score, reasoning, is_significant)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, (news_id, headline, summary, url, published_at,
@@ -61,7 +88,7 @@ class NewsStorage:
                     COUNT(*) as total,
                     COUNT(*) FILTER (WHERE is_significant = TRUE) as significant,
                     AVG(significance_score) as avg_score
-                FROM news
+                FROM news_items
                 WHERE processed_at > %s
             """, (since,))
             return dict(cursor.fetchone())
