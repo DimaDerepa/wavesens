@@ -108,9 +108,25 @@ export const apiService = {
   },
 
   async getSystemLogs(): Promise<any> {
-    // Use real-logs endpoint that shows actual Python application logs
-    const response = await api.get('/api/system/real-logs');
-    return response.data;
+    // Try Railway logs first, fallback to database logs
+    try {
+      const response = await api.get('/api/system/railway-logs');
+      const railwayLogs = response.data;
+
+      // If Railway logs are empty, try database logs
+      const hasLogs = Object.values(railwayLogs).some((logs: any) => logs && logs.length > 0);
+      if (!hasLogs) {
+        const dbResponse = await api.get('/api/system/real-logs');
+        return dbResponse.data;
+      }
+
+      return railwayLogs;
+    } catch (error) {
+      // Fallback to database logs if Railway logs fail
+      console.warn('Railway logs failed, using database logs:', error);
+      const response = await api.get('/api/system/real-logs');
+      return response.data;
+    }
   },
 
   async getTokenUsage(): Promise<any> {

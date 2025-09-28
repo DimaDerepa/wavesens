@@ -40,9 +40,15 @@ class DatabaseLogHandler(logging.Handler):
             ))
             conn.commit()
             conn.close()
+
+            # Also print to stderr so it shows up in Railway logs
+            print(f"[{self.service_name}] {message}", file=__import__('sys').stderr)
+
         except Exception as e:
             # Don't crash on logging errors, just print to stderr
-            print(f"Failed to save log to database: {e}", file=__import__('sys').stderr)
+            print(f"[{self.service_name}] DB_LOG_ERROR: {e}", file=__import__('sys').stderr)
+            # Still print the original message
+            print(f"[{self.service_name}] {self.format(record)}", file=__import__('sys').stderr)
 
 def setup_database_logging(service_name):
     """Setup database logging for a service"""
