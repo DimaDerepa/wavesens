@@ -24,6 +24,22 @@ class NewsStorage:
 
             # Создаем таблицу news_items если её нет
             cursor = self.conn.cursor()
+
+            # Проверяем есть ли колонка summary
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'news_items' AND column_name = 'summary'
+            """)
+
+            if not cursor.fetchone():
+                # Если колонки summary нет, добавляем её
+                try:
+                    cursor.execute("ALTER TABLE news_items ADD COLUMN summary TEXT")
+                    logger.info("Added summary column to news_items")
+                except:
+                    pass  # Таблицы может не быть вообще
+
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS news_items (
                     id SERIAL PRIMARY KEY,
