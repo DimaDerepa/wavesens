@@ -51,12 +51,7 @@ class Config:
 
     def validate(self):
         """Проверяем обязательные параметры"""
-        # Настройка логирования
-        logging.basicConfig(
-            level=getattr(logging, self.LOG_LEVEL),
-            format='[%(asctime)s] %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
+        # Logging is now handled by shared_logging.py
 
 
         # Валидация параметров
