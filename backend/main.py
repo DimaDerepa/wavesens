@@ -33,22 +33,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware - configure for Railway deployment
-origins = [
-    "http://localhost:3000",
-    "http://localhost:8080",
-    "https://marvelous-upliftment-production.up.railway.app",
-    "https://wavesens-production.up.railway.app",
-    "https://*.railway.app"
-]
-
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for Railway
+    allow_origins=["*"],  # In production, specify actual origins
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"]
 )
 
 # WebSocket connection manager
@@ -126,32 +117,7 @@ class DatabaseManager:
             if conn:
                 conn.close()
 
-# Initialize db_manager as None, will be created on first use
-db_manager = None
-
-def get_db_manager():
-    global db_manager
-    if db_manager is None:
-        try:
-            db_manager = DatabaseManager()
-            logger.info("Database manager initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize database manager: {e}")
-            # Don't set db_manager to None, let it try again next time
-            return None
-    return db_manager
-
-def safe_db_query(query: str, params: tuple = None, default=None):
-    """Execute database query with safe error handling"""
-    try:
-        db = get_db_manager()
-        if db is None:
-            logger.warning("Database manager not available, returning default")
-            return default or []
-        return db.execute_query(query, params)
-    except Exception as e:
-        logger.error(f"Database query failed: {e}")
-        return default or []
+db_manager = DatabaseManager()
 
 # Pydantic models
 class NewsItem(BaseModel):
@@ -241,7 +207,7 @@ async def get_dashboard_metrics():
                 ORDER BY timestamp DESC
                 LIMIT 1
             """
-            portfolio_data = safe_db_query(portfolio_query)
+            portfolio_data = db_manager.execute_query(portfolio_query)
             portfolio = portfolio_data[0] if portfolio_data else {}
         except Exception as e:
             logger.warning(f"Portfolio snapshots table not found: {e}")
@@ -253,15 +219,15 @@ async def get_dashboard_metrics():
             performance_query = """
                 SELECT
                     COUNT(*) as total_trades,
-                    0.0 as win_rate,
-                    0.0 as avg_return,
-                    0.0 as volatility,
-                    0.0 as max_drawdown
+                    AVG(CASE WHEN return_percent > 0 THEN 1.0 ELSE 0.0 END) * 100 as win_rate,
+                    AVG(return_percent) as avg_return,
+                    STDDEV(return_percent) as volatility,
+                    MIN(return_percent) as max_drawdown
                 FROM experiments
                 WHERE status = 'closed'
                 AND created_at >= CURRENT_DATE - INTERVAL '30 days'
             """
-            performance_data = safe_db_query(performance_query)
+            performance_data = db_manager.execute_query(performance_query)
             performance = performance_data[0] if performance_data else {}
         except Exception as e:
             logger.warning(f"Experiments table not found: {e}")
@@ -269,21 +235,21 @@ async def get_dashboard_metrics():
 
         # Recent activity (use correct table names and handle missing tables)
         try:
-            recent_news = safe_db_query(
+            recent_news = db_manager.execute_query(
                 "SELECT * FROM news_items WHERE is_significant = true ORDER BY processed_at DESC LIMIT 10"
             )
         except:
             recent_news = []
 
         try:
-            recent_signals = safe_db_query(
+            recent_signals = db_manager.execute_query(
                 "SELECT * FROM trading_signals ORDER BY created_at DESC LIMIT 10"
             )
         except:
             recent_signals = []
 
         try:
-            recent_experiments = safe_db_query(
+            recent_experiments = db_manager.execute_query(
                 "SELECT * FROM experiments ORDER BY created_at DESC LIMIT 10"
             )
         except:
@@ -315,36 +281,12 @@ async def get_dashboard_metrics():
         logger.error(f"Error getting dashboard metrics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/system/logs")
-async def get_system_logs():
-    """Get recent logs from all services"""
-    try:
-        # Get recent logs from database or file system
-        return {
-            "news_analyzer": [
-                {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Processing news from Finnhub API"},
-                {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Found 12 significant news items"}
-            ],
-            "signal_extractor": [
-                {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Analyzing Elliott Wave patterns"},
-                {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Generated 3 trading signals"}
-            ],
-            "experiment_manager": [
-                {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Portfolio monitoring active"},
-                {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Current positions: 0 active"}
-            ]
-        }
-    except Exception as e:
-        logger.error(f"Error getting system logs: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.get("/api/system/status")
 async def get_system_status():
     """Get system status for all three blocks"""
     return {
         "news_analyzer": {
             "status": "running",
-            "uptime": "2h 34m",
             "last_check": datetime.now().isoformat(),
             "news_processed_today": 45,
             "significant_news_today": 8
@@ -366,19 +308,19 @@ async def get_system_status():
 async def get_news(limit: int = Query(50, le=100)):
     """Get recent news"""
     query = "SELECT * FROM news_items ORDER BY published_at DESC LIMIT %s"
-    return safe_db_query(query, (limit,))
+    return db_manager.execute_query(query, (limit,))
 
 @app.get("/api/news/significant")
 async def get_significant_news(limit: int = Query(20, le=50)):
     """Get recent significant news"""
     query = "SELECT * FROM news_items WHERE is_significant = true ORDER BY published_at DESC LIMIT %s"
-    return safe_db_query(query, (limit,))
+    return db_manager.execute_query(query, (limit,))
 
 @app.get("/api/signals")
 async def get_signals(limit: int = Query(50, le=100)):
     """Get recent signals"""
     query = "SELECT * FROM trading_signals ORDER BY created_at DESC LIMIT %s"
-    return safe_db_query(query, (limit,))
+    return db_manager.execute_query(query, (limit,))
 
 @app.get("/api/signals/active")
 async def get_active_signals():
@@ -388,25 +330,25 @@ async def get_active_signals():
         WHERE s.entry_start <= NOW() AND s.entry_end >= NOW()
         ORDER BY s.created_at DESC
     """
-    return safe_db_query(query)
+    return db_manager.execute_query(query)
 
 @app.get("/api/experiments")
 async def get_experiments(limit: int = Query(50, le=100)):
     """Get recent experiments"""
     query = "SELECT * FROM experiments ORDER BY entry_time DESC LIMIT %s"
-    return safe_db_query(query, (limit,))
+    return db_manager.execute_query(query, (limit,))
 
 @app.get("/api/experiments/active")
 async def get_active_experiments():
     """Get active experiments"""
     query = "SELECT * FROM experiments WHERE status = 'active' ORDER BY entry_time DESC"
-    return safe_db_query(query)
+    return db_manager.execute_query(query)
 
 @app.get("/api/experiments/closed")
 async def get_closed_experiments(limit: int = Query(50, le=100)):
     """Get closed experiments"""
     query = "SELECT * FROM experiments WHERE status = 'closed' ORDER BY exit_time DESC LIMIT %s"
-    return safe_db_query(query, (limit,))
+    return db_manager.execute_query(query, (limit,))
 
 @app.get("/api/portfolio/snapshots")
 async def get_portfolio_snapshots(hours: int = Query(24, le=168)):
@@ -416,82 +358,47 @@ async def get_portfolio_snapshots(hours: int = Query(24, le=168)):
         WHERE timestamp >= NOW() - INTERVAL '%s hours'
         ORDER BY timestamp ASC
     """
-    return safe_db_query(query, (hours,))
+    return db_manager.execute_query(query, (hours,))
 
 @app.get("/api/portfolio/current")
 async def get_current_portfolio():
     """Get current portfolio status"""
     query = "SELECT * FROM portfolio_snapshots ORDER BY timestamp DESC LIMIT 1"
-    data = safe_db_query(query)
+    data = db_manager.execute_query(query)
     return data[0] if data else {}
 
 @app.get("/api/performance/metrics")
 async def get_performance_metrics(days: int = Query(30, le=365)):
     """Get performance metrics for the last N days"""
-    try:
-        query = """
-            SELECT
-                COUNT(*) as total_trades,
-                SUM(CASE WHEN net_pnl > 0 THEN 1 ELSE 0 END) as winning_trades,
-                AVG(CASE WHEN net_pnl IS NOT NULL THEN (net_pnl / position_size) * 100 ELSE 0 END) as avg_return,
-                STDDEV(CASE WHEN net_pnl IS NOT NULL THEN (net_pnl / position_size) * 100 ELSE 0 END) as volatility,
-                SUM(COALESCE(net_pnl, 0)) as total_pnl,
-                AVG(COALESCE(alpha, 0)) as avg_alpha
-            FROM experiments
-            WHERE status = 'closed'
-            AND exit_time >= CURRENT_DATE - INTERVAL '%s days'
-        """
-        return safe_db_query(query, (days,))
-    except Exception as e:
-        logger.error(f"Performance metrics query error: {e}")
-        return [{
-            'total_trades': 0,
-            'winning_trades': 0,
-            'avg_return': 0.0,
-            'volatility': 0.0,
-            'total_pnl': 0.0,
-            'avg_alpha': 0.0
-        }]
+    query = """
+        SELECT
+            COUNT(*) as total_trades,
+            SUM(CASE WHEN return_percent > 0 THEN 1 ELSE 0 END) as winning_trades,
+            AVG(return_percent) as avg_return,
+            STDDEV(return_percent) as volatility,
+            SUM(net_pnl) as total_pnl,
+            AVG(alpha) as avg_alpha
+        FROM experiments
+        WHERE status = 'closed'
+        AND exit_time >= CURRENT_DATE - INTERVAL '%s days'
+    """
+    return db_manager.execute_query(query, (days,))
 
 @app.get("/api/analysis/waves")
 async def get_wave_analysis():
     """Get wave analysis distribution"""
-    try:
-        # Check if trading_signals table exists and has data
-        test_query = "SELECT COUNT(*) FROM trading_signals LIMIT 1"
-        safe_db_query(test_query)
-
-        # Try alternative query without 'wave' column
-        query = """
-            SELECT
-                1 as wave,
-                COUNT(*) as signal_count,
-                AVG(COALESCE(confidence, 0.5)) as avg_confidence,
-                AVG(COALESCE(expected_move_percent, 0.0)) as avg_expected_move
-            FROM trading_signals
-            WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
-        """
-        result = safe_db_query(query)
-
-        # If we have data, distribute it across 5 waves
-        if result and result[0]['signal_count'] > 0:
-            base_count = result[0]['signal_count'] // 5
-            base_conf = result[0]['avg_confidence']
-            base_move = result[0]['avg_expected_move']
-
-            return [
-                {'wave': 1, 'signal_count': base_count, 'avg_confidence': base_conf, 'avg_expected_move': abs(base_move)},
-                {'wave': 2, 'signal_count': base_count, 'avg_confidence': base_conf * 0.8, 'avg_expected_move': -abs(base_move) * 0.6},
-                {'wave': 3, 'signal_count': base_count, 'avg_confidence': base_conf * 1.2, 'avg_expected_move': abs(base_move) * 1.5},
-                {'wave': 4, 'signal_count': base_count, 'avg_confidence': base_conf * 0.7, 'avg_expected_move': -abs(base_move) * 0.4},
-                {'wave': 5, 'signal_count': base_count, 'avg_confidence': base_conf, 'avg_expected_move': abs(base_move) * 0.8}
-            ]
-        else:
-            return []
-
-    except Exception as e:
-        logger.error(f"Wave analysis query error: {e}")
-        return []
+    query = """
+        SELECT
+            wave,
+            COUNT(*) as signal_count,
+            AVG(confidence) as avg_confidence,
+            AVG(expected_move_percent) as avg_expected_move
+        FROM trading_signals
+        WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+        GROUP BY wave
+        ORDER BY wave
+    """
+    return db_manager.execute_query(query)
 
 @app.get("/api/portfolio/pnl-history")
 async def get_pnl_history(days: int = Query(30, le=365)):
@@ -507,7 +414,7 @@ async def get_pnl_history(days: int = Query(30, le=365)):
         GROUP BY DATE(exit_time)
         ORDER BY date
     """
-    return safe_db_query(query, (days,))
+    return db_manager.execute_query(query, (days,))
 
 # WebSocket endpoint
 @app.websocket("/ws")
@@ -555,63 +462,59 @@ async def broadcast_updates():
 @app.on_event("startup")
 async def startup_event():
     logger.info("WaveSens API Server starting up...")
-    logger.info(f"PORT: {os.getenv('PORT', 'not set')}")
-    logger.info(f"DATABASE_URL: {'set' if os.getenv('DATABASE_URL') else 'not set'}")
-    logger.info(f"Environment: {os.getenv('RAILWAY_ENVIRONMENT', 'unknown')}")
-    logger.info("Server initialization complete")
+    # Start background broadcasting task
+    asyncio.create_task(broadcast_updates())
 
-# Health check endpoint
+@app.get("/api/system/logs")
+async def get_system_logs():
+    """Get recent logs from all services"""
+    return {
+        "news_analyzer": [
+            {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Processing news from Finnhub API"},
+            {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Found 12 significant news items"}
+        ],
+        "signal_extractor": [
+            {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Analyzing Elliott Wave patterns"},
+            {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Generated 3 trading signals"}
+        ],
+        "experiment_manager": [
+            {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Portfolio monitoring active"},
+            {"timestamp": datetime.now().isoformat(), "level": "INFO", "message": "Current positions: 0 active"}
+        ]
+    }
+
 @app.get("/api/system/tokens")
 async def get_token_usage():
     """Get OpenRouter token usage and costs"""
-    try:
-        # TODO: Implement real OpenRouter API calls to get usage
-        return {
-            "total_tokens_used": 245670,
-            "tokens_today": 12450,
-            "total_cost_usd": 12.34,
-            "cost_today_usd": 0.56,
-            "current_model": "anthropic/claude-3.5-sonnet",
-            "available_models": [
-                {"id": "anthropic/claude-3.5-sonnet", "name": "Claude 3.5 Sonnet", "cost_per_1k": 0.003},
-                {"id": "openai/gpt-4", "name": "GPT-4", "cost_per_1k": 0.03},
-                {"id": "openai/gpt-3.5-turbo", "name": "GPT-3.5 Turbo", "cost_per_1k": 0.0015}
-            ]
-        }
-    except Exception as e:
-        logger.error(f"Error getting token usage: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    return {
+        "total_tokens_used": 245670,
+        "tokens_today": 12450,
+        "total_cost_usd": 12.34,
+        "cost_today_usd": 0.56,
+        "current_model": "anthropic/claude-3.5-sonnet",
+        "available_models": [
+            {"id": "anthropic/claude-3.5-sonnet", "name": "Claude 3.5 Sonnet", "cost_per_1k": 0.003},
+            {"id": "openai/gpt-4", "name": "GPT-4", "cost_per_1k": 0.03},
+            {"id": "openai/gpt-3.5-turbo", "name": "GPT-3.5 Turbo", "cost_per_1k": 0.0015}
+        ]
+    }
 
 @app.post("/api/system/model")
 async def change_model(model_data: dict):
     """Change the working model for News Analyzer"""
-    try:
-        model_id = model_data.get("model_id")
-        # TODO: Implement model change logic
-        return {"success": True, "new_model": model_id}
-    except Exception as e:
-        logger.error(f"Error changing model: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    model_id = model_data.get("model_id")
+    return {"success": True, "new_model": model_id}
 
+# Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Basic health check without database dependency"""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
-
-@app.get("/health/db")
-async def health_check_db():
-    """Health check with database connection"""
     try:
-        db = get_db_manager()
-        if db is None:
-            return {"status": "unhealthy", "database": "disconnected", "error": "Database manager not initialized", "timestamp": datetime.now().isoformat()}
-
-        db.execute_query("SELECT 1")
-        return {"status": "healthy", "database": "connected", "timestamp": datetime.now().isoformat()}
+        # Test database connection
+        db_manager.execute_query("SELECT 1")
+        return {"status": "healthy", "timestamp": datetime.now().isoformat()}
     except Exception as e:
-        logger.error(f"Database health check failed: {e}")
-        return {"status": "unhealthy", "database": "disconnected", "error": str(e), "timestamp": datetime.now().isoformat()}
+        logger.error(f"Health check failed: {e}")
+        raise HTTPException(status_code=503, detail="Service unhealthy")
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port, reload=False)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)

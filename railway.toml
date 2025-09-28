@@ -1,9 +1,26 @@
 [build]
-builder = "dockerfile"
+buildCommand = "echo 'Building WaveSens services'"
 
 [deploy]
-startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
-healthcheckPath = "/health"
-healthcheckTimeout = 300
-restartPolicyType = "on_failure"
-restartPolicyMaxRetries = 10
+startCommand = "echo 'This is a monorepo. Deploy individual services from their directories.'"
+
+# Service configurations for Railway
+[services.backend]
+source = "backend/"
+buildCommand = "echo 'Building backend'"
+
+[services.frontend]
+source = "frontend/"
+buildCommand = "echo 'Building frontend'"
+
+[services.news_analyzer]
+source = "news_analyzer/"
+buildCommand = "echo 'Building news analyzer'"
+
+[services.signal_extractor]
+source = "signal_extractor/"
+buildCommand = "echo 'Building signal extractor'"
+
+[services.experiment_manager]
+source = "experiment_manager/"
+buildCommand = "echo 'Building experiment manager'"
