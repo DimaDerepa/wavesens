@@ -193,75 +193,7 @@ async def clear_all_logs():
     except Exception as e:
         return {"error": str(e)}
 
-@app.post("/api/debug/force-service-logs")
-async def force_service_logs():
-    """Force generate test logs from each service to database"""
-    try:
-        from datetime import datetime
-        import random
-
-        # Simulate logs that services would generate
-        test_logs = [
-            {
-                "timestamp": datetime.now(),
-                "level": "INFO",
-                "message": "🔴 Market closed: Weekend. Sleeping for 1 hour to save tokens...",
-                "service": "news_analyzer"
-            },
-            {
-                "timestamp": datetime.now(),
-                "level": "INFO",
-                "message": "📊 Hourly stats: Checks: 59, News processed: 0, Significant: 0 (0.0%)",
-                "service": "news_analyzer"
-            },
-            {
-                "timestamp": datetime.now(),
-                "level": "ERROR",
-                "message": "LLM analysis failed: litellm.APIError: APIError: OpenrouterException",
-                "service": "news_analyzer"
-            },
-            {
-                "timestamp": datetime.now(),
-                "level": "INFO",
-                "message": "Listening for notifications on channel 'new_significant_news'",
-                "service": "signal_extractor"
-            },
-            {
-                "timestamp": datetime.now(),
-                "level": "INFO",
-                "message": "Starting Signal Extractor - monitoring wave patterns",
-                "service": "signal_extractor"
-            },
-            {
-                "timestamp": datetime.now(),
-                "level": "INFO",
-                "message": f"Portfolio status: $10456.00, 3 positions",
-                "service": "experiment_manager"
-            },
-            {
-                "timestamp": datetime.now(),
-                "level": "INFO",
-                "message": "Starting position monitoring thread",
-                "service": "experiment_manager"
-            }
-        ]
-
-        for log_entry in test_logs:
-            db_manager.execute_query("""
-                INSERT INTO application_logs (timestamp, level, message, service)
-                VALUES (%s, %s, %s, %s)
-            """, (
-                log_entry["timestamp"],
-                log_entry["level"],
-                log_entry["message"],
-                log_entry["service"]
-            ))
-
-        return {"message": f"Generated {len(test_logs)} service logs", "count": len(test_logs)}
-
-    except Exception as e:
-        logger.error(f"Failed to force service logs: {e}")
-        return {"error": str(e)}
+# REMOVED MOCK ENDPOINT - NO MORE FAKE LOGS
 
 @app.get("/api/system/railway-logs")
 async def get_railway_logs():

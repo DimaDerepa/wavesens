@@ -108,24 +108,19 @@ export const apiService = {
   },
 
   async getSystemLogs(): Promise<any> {
-    // Try Railway logs first, fallback to database logs
+    // For now, just return empty logs - no more mocks
+    // Frontend should show "No recent logs available"
+    // until real service logs are captured
     try {
-      const response = await api.get('/api/system/railway-logs');
-      const railwayLogs = response.data;
-
-      // If Railway logs are empty, try database logs
-      const hasLogs = Object.values(railwayLogs).some((logs: any) => logs && logs.length > 0);
-      if (!hasLogs) {
-        const dbResponse = await api.get('/api/system/real-logs');
-        return dbResponse.data;
-      }
-
-      return railwayLogs;
-    } catch (error) {
-      // Fallback to database logs if Railway logs fail
-      console.warn('Railway logs failed, using database logs:', error);
       const response = await api.get('/api/system/real-logs');
       return response.data;
+    } catch (error) {
+      console.error('Failed to get real logs:', error);
+      return {
+        "news_analyzer": [],
+        "signal_extractor": [],
+        "experiment_manager": []
+      };
     }
   },
 
