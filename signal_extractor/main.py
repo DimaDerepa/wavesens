@@ -80,19 +80,29 @@ class SignalExtractorService:
                 )
             """)
 
-            # Добавляем processed_by_block2 если ее нет
-            cursor.execute("""
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_name = 'news_items' AND column_name = 'processed_by_block2'
-            """)
+            # Добавляем недостающие колонки если их нет
+            missing_columns = {
+                'processed_by_block2': 'BOOLEAN DEFAULT FALSE',
+                'processed_at': 'TIMESTAMP WITH TIME ZONE DEFAULT NOW()',
+                'summary': 'TEXT',
+                'url': 'VARCHAR(500)',
+                'reasoning': 'TEXT',
+                'significance_score': 'DECIMAL(3,2)'
+            }
 
-            if not cursor.fetchone():
-                try:
-                    cursor.execute("ALTER TABLE news_items ADD COLUMN processed_by_block2 BOOLEAN DEFAULT FALSE")
-                    logger.info("Added processed_by_block2 column to news_items")
-                except Exception as e:
-                    logger.debug(f"Could not add processed_by_block2 column: {e}")
+            for col_name, col_type in missing_columns.items():
+                cursor.execute("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'news_items' AND column_name = %s
+                """, (col_name,))
+
+                if not cursor.fetchone():
+                    try:
+                        cursor.execute(f"ALTER TABLE news_items ADD COLUMN {col_name} {col_type}")
+                        logger.info(f"Added {col_name} column to news_items")
+                    except Exception as e:
+                        logger.debug(f"Could not add {col_name} column: {e}")
 
             # Создаем trading_signals если нет
             cursor.execute("""
