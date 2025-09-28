@@ -165,27 +165,24 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize logs table: {e}")
 
-# Add some test logs for immediate display
-def add_test_logs():
+# Removed fake test logs - using only REAL service logs now
+
+@app.post("/api/debug/clear-fake-logs")
+async def clear_fake_logs():
+    """Clear fake service started logs from database"""
     try:
-        test_logs = [
-            ("INFO", "News analyzer service started", "news_analyzer"),
-            ("INFO", "Market monitoring active", "signal_extractor"),
-            ("INFO", "Portfolio management initialized", "experiment_manager"),
-            ("INFO", "WaveSens backend service starting up", "backend")
-        ]
-
-        for level, message, service in test_logs:
-            db_manager.execute_query("""
-                INSERT INTO application_logs (timestamp, level, message, service)
-                VALUES (NOW(), %s, %s, %s)
-            """, (level, message, service))
-
-        logger.info("Test logs added")
+        result = db_manager.execute_query("""
+            DELETE FROM application_logs
+            WHERE message IN (
+                'News analyzer service started',
+                'Market monitoring active',
+                'Portfolio management initialized',
+                'WaveSens backend service starting up'
+            )
+        """)
+        return {"message": "Fake logs cleared", "deleted": result}
     except Exception as e:
-        logger.error(f"Failed to add test logs: {e}")
-
-add_test_logs()
+        return {"error": str(e)}
 
 # Add endpoint to get real logs from database
 @app.get("/api/system/real-logs")
