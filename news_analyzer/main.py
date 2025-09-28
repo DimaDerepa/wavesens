@@ -11,10 +11,7 @@ from datetime import datetime, timezone, timedelta
 
 from config import Config
 from storage import NewsStorage
-try:
-    from simple_analyzer import SimpleNewsAnalyzer as NewsAnalyzer
-except ImportError:
-    from analyzer import NewsAnalyzer
+from analyzer import NewsAnalyzer
 
 logger = logging.getLogger(__name__)
 

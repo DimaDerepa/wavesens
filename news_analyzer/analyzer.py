@@ -23,9 +23,18 @@ class NewsAnalyzer:
         import os
         os.environ['OPENROUTER_API_KEY'] = openrouter_api_key
 
+        # Отключаем proxies в litellm для избежания ошибки
+        try:
+            import litellm
+            litellm.drop_params = True
+            litellm.turn_off_message_logging = True
+        except:
+            pass
+
         self.lm = dspy.LM(
             model=f"openrouter/{model_name}",
             api_key=openrouter_api_key,
+            api_base="https://openrouter.ai/api/v1",
             temperature=temperature
         )
         dspy.settings.configure(lm=self.lm)

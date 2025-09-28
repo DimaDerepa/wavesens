@@ -25,20 +25,32 @@ class NewsStorage:
             # Создаем таблицу news_items если её нет
             cursor = self.conn.cursor()
 
-            # Проверяем есть ли колонка summary
-            cursor.execute("""
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_name = 'news_items' AND column_name = 'summary'
-            """)
+            # Проверяем и добавляем недостающие колонки
+            missing_columns = ['summary', 'url', 'reasoning', 'significance_score', 'is_significant']
 
-            if not cursor.fetchone():
-                # Если колонки summary нет, добавляем её
-                try:
-                    cursor.execute("ALTER TABLE news_items ADD COLUMN summary TEXT")
-                    logger.info("Added summary column to news_items")
-                except:
-                    pass  # Таблицы может не быть вообще
+            for col_name in missing_columns:
+                cursor.execute("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'news_items' AND column_name = %s
+                """, (col_name,))
+
+                if not cursor.fetchone():
+                    try:
+                        if col_name == 'summary':
+                            cursor.execute("ALTER TABLE news_items ADD COLUMN summary TEXT")
+                        elif col_name == 'url':
+                            cursor.execute("ALTER TABLE news_items ADD COLUMN url VARCHAR(500)")
+                        elif col_name == 'reasoning':
+                            cursor.execute("ALTER TABLE news_items ADD COLUMN reasoning TEXT")
+                        elif col_name == 'significance_score':
+                            cursor.execute("ALTER TABLE news_items ADD COLUMN significance_score DECIMAL(3,2)")
+                        elif col_name == 'is_significant':
+                            cursor.execute("ALTER TABLE news_items ADD COLUMN is_significant BOOLEAN DEFAULT FALSE")
+                        logger.info(f"Added {col_name} column to news_items")
+                    except Exception as e:
+                        logger.debug(f"Could not add {col_name} column: {e}")
+                        pass  # Таблицы может не быть вообще
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS news_items (
