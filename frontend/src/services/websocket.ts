@@ -15,14 +15,25 @@ class WebSocketService {
   private url: string;
 
   constructor() {
-    // TEMPORARY HARDCODED FIX - Railway env vars not working
+    // Railway service reference solution
     const getWsUrl = () => {
-      // HARDCODED Railway WebSocket URL for testing
-      if (process.env.NODE_ENV === 'production') {
+      // For Railway: use window.location.hostname to detect if we're on Railway
+      if (typeof window !== 'undefined' && window.location.hostname.includes('.railway.app')) {
+        // We're on Railway, use the backend WebSocket URL
         return 'wss://backend-production-7a68.up.railway.app/ws';
       }
 
-      // Local development
+      // Check environment variables for local development
+      if (process.env.REACT_APP_WS_URL) {
+        return process.env.REACT_APP_WS_URL;
+      }
+
+      if (process.env.REACT_APP_BACKEND_URL) {
+        const backendUrl = process.env.REACT_APP_BACKEND_URL;
+        return backendUrl.replace('http://', 'ws://').replace('https://', 'wss://') + '/ws';
+      }
+
+      // Local development fallback
       return 'ws://localhost:8000/ws';
     };
 

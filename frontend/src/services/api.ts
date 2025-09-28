@@ -1,14 +1,24 @@
 import axios from 'axios';
 import { NewsItem, Signal, Experiment, PortfolioSnapshot, SystemStatus, DashboardMetrics } from '../types';
 
-// TEMPORARY HARDCODED FIX - Railway env vars not working
+// Railway service reference solution
 const getApiBaseUrl = () => {
-  // HARDCODED Railway backend URL for testing
-  if (process.env.NODE_ENV === 'production') {
+  // For Railway: use window.location.origin to detect if we're on Railway
+  if (typeof window !== 'undefined' && window.location.hostname.includes('.railway.app')) {
+    // We're on Railway, use the hardcoded backend URL
     return 'https://backend-production-7a68.up.railway.app';
   }
 
-  // Local development
+  // Check environment variables for local development
+  if (process.env.REACT_APP_BACKEND_URL) {
+    return process.env.REACT_APP_BACKEND_URL;
+  }
+
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+
+  // Local development fallback
   return 'http://localhost:8000';
 };
 
