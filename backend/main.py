@@ -187,6 +187,49 @@ def add_test_logs():
 
 add_test_logs()
 
+# Add endpoint to get real logs from database
+@app.get("/api/system/real-logs")
+async def get_real_system_logs():
+    """Get real logs from application_logs table"""
+    try:
+        logs = {
+            "news_analyzer": [],
+            "signal_extractor": [],
+            "experiment_manager": []
+        }
+
+        # Get real logs from application_logs table
+        recent_logs = db_manager.execute_query("""
+            SELECT timestamp, level, message, service
+            FROM application_logs
+            WHERE timestamp >= NOW() - INTERVAL '24 hours'
+            ORDER BY timestamp DESC
+            LIMIT 50
+        """)
+
+        # Group logs by service
+        for log in recent_logs:
+            service = log.get('service', 'backend')
+            if service in logs:
+                logs[service].append({
+                    "timestamp": log.get('timestamp', datetime.now()).isoformat(),
+                    "level": log.get('level', 'INFO'),
+                    "message": log.get('message', 'Unknown log message')
+                })
+
+        # Add real-time log entry to demonstrate live logging
+        logger.info("System logs accessed via real-logs endpoint")
+
+        return logs
+
+    except Exception as e:
+        logger.error(f"Failed to get real logs: {e}")
+        return {
+            "news_analyzer": [{"timestamp": datetime.now().isoformat(), "level": "ERROR", "message": f"Failed to get logs: {str(e)}"}],
+            "signal_extractor": [{"timestamp": datetime.now().isoformat(), "level": "ERROR", "message": f"Failed to get logs: {str(e)}"}],
+            "experiment_manager": [{"timestamp": datetime.now().isoformat(), "level": "ERROR", "message": f"Failed to get logs: {str(e)}"}]
+        }
+
 # Pydantic models
 class NewsItem(BaseModel):
     id: str
