@@ -108,7 +108,8 @@ export const apiService = {
   },
 
   async getSystemLogs(): Promise<any> {
-    const response = await api.get('/api/system/logs');
+    // Use real-logs endpoint that shows actual Python application logs
+    const response = await api.get('/api/system/real-logs');
     return response.data;
   },
 
