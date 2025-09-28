@@ -1,19 +1,14 @@
 import axios from 'axios';
 import { NewsItem, Signal, Experiment, PortfolioSnapshot, SystemStatus, DashboardMetrics } from '../types';
 
-// Get backend URL from environment or use localhost for development
+// TEMPORARY HARDCODED FIX - Railway env vars not working
 const getApiBaseUrl = () => {
-  // Check for environment variable first (Railway will set this)
-  if (process.env.REACT_APP_BACKEND_URL) {
-    return process.env.REACT_APP_BACKEND_URL;
+  // HARDCODED Railway backend URL for testing
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://backend-production-7a68.up.railway.app';
   }
 
-  // Fallback to old env var name
-  if (process.env.REACT_APP_API_URL) {
-    return process.env.REACT_APP_API_URL;
-  }
-
-  // Default for local development
+  // Local development
   return 'http://localhost:8000';
 };
 
