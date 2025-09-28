@@ -23,6 +23,7 @@ const Dashboard: React.FC = () => {
 
   const loadDashboardData = async () => {
     try {
+      console.log('📊 Loading dashboard data...');
       setLoading(true);
       const [dashboardMetrics, portfolioSnapshots] = await Promise.all([
         apiService.getDashboardMetrics(),
@@ -39,7 +40,7 @@ const Dashboard: React.FC = () => {
       setError(null);
     } catch (err) {
       setError('Failed to load dashboard data');
-      console.error('Dashboard load error:', err);
+      console.error('❌ Dashboard load error:', err);
     } finally {
       setLoading(false);
     }
