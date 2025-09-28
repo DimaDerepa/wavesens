@@ -149,6 +149,44 @@ class DatabaseManager:
 
 db_manager = DatabaseManager()
 
+# Create application_logs table if it doesn't exist
+try:
+    db_manager.execute_query("""
+        CREATE TABLE IF NOT EXISTS application_logs (
+            id SERIAL PRIMARY KEY,
+            timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+            level VARCHAR(10) NOT NULL,
+            message TEXT NOT NULL,
+            service VARCHAR(50) NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        )
+    """)
+    logger.info("Application logs table ready")
+except Exception as e:
+    logger.error(f"Failed to initialize logs table: {e}")
+
+# Add some test logs for immediate display
+def add_test_logs():
+    try:
+        test_logs = [
+            ("INFO", "News analyzer service started", "news_analyzer"),
+            ("INFO", "Market monitoring active", "signal_extractor"),
+            ("INFO", "Portfolio management initialized", "experiment_manager"),
+            ("INFO", "WaveSens backend service starting up", "backend")
+        ]
+
+        for level, message, service in test_logs:
+            db_manager.execute_query("""
+                INSERT INTO application_logs (timestamp, level, message, service)
+                VALUES (NOW(), %s, %s, %s)
+            """, (level, message, service))
+
+        logger.info("Test logs added")
+    except Exception as e:
+        logger.error(f"Failed to add test logs: {e}")
+
+add_test_logs()
+
 # Pydantic models
 class NewsItem(BaseModel):
     id: str
