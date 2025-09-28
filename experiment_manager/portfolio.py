@@ -144,8 +144,8 @@ class PortfolioManager:
                 'unrealized_pnl': unrealized_pnl,
                 'realized_pnl_today': snapshot['realized_pnl_today'],
                 'realized_pnl_total': snapshot['realized_pnl_total'],
-                'daily_return': float(((current_value / snapshot['total_value']) - 1) * 100) if snapshot['total_value'] > 0 else 0,
-                'total_return': float(((current_value / self.config.INITIAL_CAPITAL) - 1) * 100),
+                'daily_return': float(((float(current_value) / float(snapshot['total_value'])) - 1) * 100) if float(snapshot['total_value']) > 0 else 0,
+                'total_return': float(((float(current_value) / float(self.config.INITIAL_CAPITAL)) - 1) * 100),
                 'available_cash': snapshot['cash_balance'],
                 'last_updated': snapshot['timestamp']
             }
@@ -216,7 +216,7 @@ class PortfolioManager:
                 return False, f"Would violate cash reserve: ${cash_after_position} < ${min_cash_reserve}"
 
             # Проверка 6: Daily loss limit
-            daily_loss_percent = float(abs(portfolio['realized_pnl_today']) / portfolio['total_value']) * 100
+            daily_loss_percent = float(abs(float(portfolio['realized_pnl_today'])) / float(portfolio['total_value'])) * 100
             if daily_loss_percent >= self.config.DAILY_LOSS_LIMIT_PERCENT:
                 return False, f"Daily loss limit reached: {daily_loss_percent:.1f}% >= {self.config.DAILY_LOSS_LIMIT_PERCENT}%"
 
@@ -487,7 +487,7 @@ class PortfolioManager:
         """Проверяет превышение дневного лимита потерь"""
         try:
             portfolio = self.get_portfolio_status()
-            daily_loss_percent = float(abs(portfolio['realized_pnl_today']) / portfolio['total_value']) * 100
+            daily_loss_percent = float(abs(float(portfolio['realized_pnl_today'])) / float(portfolio['total_value'])) * 100
 
             return daily_loss_percent >= self.config.DAILY_LOSS_LIMIT_PERCENT
 
