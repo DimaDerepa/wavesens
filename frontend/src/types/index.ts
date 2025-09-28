@@ -115,6 +115,25 @@ export interface DashboardMetrics {
     latest_signals: Signal[];
     latest_experiments: Experiment[];
   };
+  system_status: {
+    uptime_hours: number;
+    uptime_display: string;
+    news_analyzer: {
+      status: 'running' | 'stopped' | 'error';
+      last_check: string;
+      news_processed_today: number;
+    };
+    signal_extractor: {
+      status: 'running' | 'stopped' | 'error';
+      last_signal: string;
+      signals_generated_today: number;
+    };
+    experiment_manager: {
+      status: 'running' | 'stopped' | 'error';
+      active_positions: number;
+      portfolio_value: number;
+    };
+  };
 }
 
 export interface WebSocketMessage {

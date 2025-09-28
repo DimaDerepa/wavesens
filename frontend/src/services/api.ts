@@ -105,6 +105,21 @@ export const apiService = {
   async getPnlHistory(days = 30): Promise<any> {
     const response = await api.get(`/api/portfolio/pnl-history?days=${days}`);
     return response.data;
+  },
+
+  async getSystemLogs(): Promise<any> {
+    const response = await api.get('/api/system/logs');
+    return response.data;
+  },
+
+  async getTokenUsage(): Promise<any> {
+    const response = await api.get('/api/system/tokens');
+    return response.data;
+  },
+
+  async changeModel(modelId: string): Promise<any> {
+    const response = await api.post('/api/system/model', { model_id: modelId });
+    return response.data;
   }
 };
 

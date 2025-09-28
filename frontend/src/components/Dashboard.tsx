@@ -13,27 +13,51 @@ const Dashboard: React.FC = () => {
   const [portfolioData, setPortfolioData] = useState<any[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<string>('DISCONNECTED');
   const [waveAnalysis, setWaveAnalysis] = useState<any>(null);
+  const [systemLogs, setSystemLogs] = useState<any>(null);
+  const [tokenUsage, setTokenUsage] = useState<any>(null);
+  const [isWeekend, setIsWeekend] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
     setupWebSocket();
+    checkWeekend();
 
     const interval = setInterval(loadDashboardData, 30000);
     return () => clearInterval(interval);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const checkWeekend = () => {
+    const now = new Date();
+    const day = now.getDay();
+    setIsWeekend(day === 0 || day === 6); // Sunday = 0, Saturday = 6
+  };
+
+  const handleModelChange = async (modelId: string) => {
+    try {
+      await apiService.changeModel(modelId);
+      // Reload data to get updated model info
+      loadDashboardData();
+    } catch (err) {
+      console.error('Failed to change model:', err);
+    }
+  };
+
   const loadDashboardData = async () => {
     try {
       console.log('📊 Loading dashboard data...');
       setLoading(true);
-      const [dashboardMetrics, portfolioSnapshots, waveData] = await Promise.all([
+      const [dashboardMetrics, portfolioSnapshots, waveData, logsData, tokensData] = await Promise.all([
         apiService.getDashboardMetrics(),
         apiService.getPortfolioSnapshots(24),
-        apiService.getWaveAnalysis()
+        apiService.getWaveAnalysis(),
+        apiService.getSystemLogs(),
+        apiService.getTokenUsage()
       ]);
 
       setMetrics(dashboardMetrics);
       setWaveAnalysis(waveData);
+      setSystemLogs(logsData);
+      setTokenUsage(tokensData);
       setPortfolioData(portfolioSnapshots.map(snap => ({
         time: new Date(snap.timestamp).toLocaleTimeString(),
         portfolio: snap.total_value,
@@ -151,6 +175,29 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Weekend Banner */}
+      {isWeekend && (
+        <div style={{
+          maxWidth: '80rem',
+          margin: '0 auto',
+          padding: '1rem'
+        }}>
+          <div style={{
+            padding: '1rem',
+            backgroundColor: '#fef3c7',
+            border: '1px solid #f59e0b',
+            borderRadius: '0.5rem',
+            color: '#92400e',
+            fontSize: '0.875rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            📅 <strong>Weekend Mode:</strong> Markets are closed. News analysis is running in limited mode to save tokens.
+          </div>
+        </div>
+      )}
 
       <div style={{ maxWidth: '80rem', margin: '0 auto', padding: '2rem 1rem' }}>
         {/* Key Metrics */}
@@ -299,6 +346,124 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
               )) || <div style={{ color: '#6b7280', textAlign: 'center', padding: '1rem' }}>No active positions</div>}
+            </div>
+          </Card>
+        </div>
+
+        {/* System Status & Controls */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem', marginTop: '2rem' }}>
+          {/* Service Status */}
+          <Card title="Service Status & Uptime" loading={loading}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {metrics?.system_status && Object.entries(metrics.system_status).map(([service, status]: [string, any]) => (
+                <div key={service} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: '#f9fafb', borderRadius: '0.375rem' }}>
+                  <div>
+                    <div style={{ fontWeight: '500', textTransform: 'capitalize' }}>{service.replace('_', ' ')}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Uptime: {status.uptime || 'Unknown'}</div>
+                  </div>
+                  <div style={{
+                    padding: '0.25rem 0.5rem',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.75rem',
+                    backgroundColor: status.status === 'running' ? '#dcfce7' : '#fee2e2',
+                    color: status.status === 'running' ? '#166534' : '#991b1b'
+                  }}>
+                    {status.status === 'running' ? '🟢 Running' : '🔴 Stopped'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          {/* Token Usage */}
+          <Card title="OpenRouter Usage & Costs" loading={loading}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {tokenUsage && (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: '#f0f9ff', borderRadius: '0.375rem' }}>
+                      <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#0284c7' }}>
+                        {tokenUsage.tokens_today?.toLocaleString() || 0}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Tokens Today</div>
+                    </div>
+                    <div style={{ textAlign: 'center', padding: '0.75rem', backgroundColor: '#f0fdf4', borderRadius: '0.375rem' }}>
+                      <div style={{ fontSize: '1.25rem', fontWeight: '600', color: '#059669' }}>
+                        ${tokenUsage.cost_today_usd?.toFixed(2) || '0.00'}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>Cost Today</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.875rem', color: '#6b7280', textAlign: 'center' }}>
+                    Total: {tokenUsage.total_tokens_used?.toLocaleString() || 0} tokens • ${tokenUsage.total_cost_usd?.toFixed(2) || '0.00'}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280', textAlign: 'center' }}>
+                    Current Model: {tokenUsage.current_model || 'Unknown'}
+                  </div>
+                </>
+              )}
+            </div>
+          </Card>
+
+          {/* Model Selection */}
+          <Card title="Model Selection" loading={loading}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              {tokenUsage?.available_models?.map((model: any) => (
+                <div
+                  key={model.id}
+                  onClick={() => handleModelChange(model.id)}
+                  style={{
+                    padding: '0.75rem',
+                    border: tokenUsage.current_model === model.id ? '2px solid #3b82f6' : '1px solid #d1d5db',
+                    borderRadius: '0.375rem',
+                    cursor: 'pointer',
+                    backgroundColor: tokenUsage.current_model === model.id ? '#eff6ff' : '#ffffff',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <div style={{ fontWeight: '500', fontSize: '0.875rem' }}>{model.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                    ${model.cost_per_1k}/1k tokens
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </div>
+
+        {/* Service Logs */}
+        <div style={{ marginTop: '2rem' }}>
+          <Card title="Service Logs" loading={loading}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+              {systemLogs && Object.entries(systemLogs).map(([service, logs]: [string, any]) => (
+                <div key={service}>
+                  <h4 style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', textTransform: 'capitalize' }}>
+                    {service.replace('_', ' ')}
+                  </h4>
+                  <div style={{
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    backgroundColor: '#1f2937',
+                    color: '#f3f4f6',
+                    padding: '0.75rem',
+                    borderRadius: '0.375rem',
+                    fontSize: '0.75rem',
+                    fontFamily: 'monospace'
+                  }}>
+                    {logs.map((log: any, index: number) => (
+                      <div key={index} style={{ marginBottom: '0.25rem' }}>
+                        <span style={{ color: log.level === 'ERROR' ? '#f87171' : log.level === 'WARN' ? '#fbbf24' : '#34d399' }}>
+                          [{log.level}]
+                        </span>
+                        <span style={{ color: '#9ca3af', marginLeft: '0.5rem' }}>
+                          {new Date(log.timestamp).toLocaleTimeString()}
+                        </span>
+                        <div style={{ marginLeft: '1rem' }}>{log.message}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
         </div>
