@@ -47,16 +47,9 @@ class DatabaseLogHandler(logging.Handler):
 def setup_database_logging(service_name):
     """Setup database logging for a service"""
     try:
-        # Setup basic logging first
-        logging.basicConfig(
-            level=logging.INFO,
-            format='[%(asctime)s] %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
-
         # Create database log handler
         db_handler = DatabaseLogHandler(service_name)
-        db_handler.setLevel(logging.INFO)
+        db_handler.setLevel(logging.DEBUG)  # Capture ALL logs
 
         # Add formatter to match current format
         formatter = logging.Formatter('[%(asctime)s] %(levelname)s - %(message)s',
@@ -65,7 +58,7 @@ def setup_database_logging(service_name):
 
         # Add handler to root logger to catch all logs
         root_logger = logging.getLogger()
-        root_logger.setLevel(logging.INFO)  # Make sure root logger accepts INFO logs
+        root_logger.setLevel(logging.DEBUG)  # Make sure root logger accepts ALL logs
         root_logger.addHandler(db_handler)
 
         print(f"Database logging enabled for {service_name}")

@@ -45,7 +45,12 @@ class Config:
         if not self.OPENROUTER_API_KEY:
             raise ValueError("OPENROUTER_API_KEY required")
 
-        # Logging is now handled by shared_logging.py
+        # Настройка логирования
+        logging.basicConfig(
+            level=getattr(logging, self.LOG_LEVEL),
+            format='[%(asctime)s] %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
 
 
     def get_wave_info(self, minutes_old):
