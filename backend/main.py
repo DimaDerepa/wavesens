@@ -15,6 +15,7 @@ import psycopg2.extras
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import uvicorn
 
@@ -191,47 +192,68 @@ async def root():
 async def get_dashboard_metrics():
     """Get comprehensive dashboard metrics"""
     try:
-        # Portfolio metrics
-        portfolio_query = """
-            SELECT
-                total_value,
-                cash_balance,
-                positions_count,
-                realized_pnl_today,
-                total_return,
-                alpha_daily
-            FROM portfolio_snapshots
-            ORDER BY timestamp DESC
-            LIMIT 1
-        """
-        portfolio_data = db_manager.execute_query(portfolio_query)
-        portfolio = portfolio_data[0] if portfolio_data else {}
+        # Portfolio metrics (handle missing table)
+        portfolio = {}
+        try:
+            portfolio_query = """
+                SELECT
+                    total_value,
+                    cash_balance,
+                    positions_count,
+                    realized_pnl_today,
+                    total_return,
+                    daily_return
+                FROM portfolio_snapshots
+                ORDER BY timestamp DESC
+                LIMIT 1
+            """
+            portfolio_data = db_manager.execute_query(portfolio_query)
+            portfolio = portfolio_data[0] if portfolio_data else {}
+        except Exception as e:
+            logger.warning(f"Portfolio snapshots table not found: {e}")
+            portfolio = {}
 
-        # Performance metrics
-        performance_query = """
-            SELECT
-                COUNT(*) as total_trades,
-                AVG(CASE WHEN return_percent > 0 THEN 1.0 ELSE 0.0 END) * 100 as win_rate,
-                AVG(return_percent) as avg_return,
-                STDDEV(return_percent) as volatility,
-                MIN(return_percent) as max_drawdown
-            FROM experiments
-            WHERE status = 'closed'
-            AND exit_time >= CURRENT_DATE - INTERVAL '30 days'
-        """
-        performance_data = db_manager.execute_query(performance_query)
-        performance = performance_data[0] if performance_data else {}
+        # Performance metrics (handle missing table)
+        performance = {}
+        try:
+            performance_query = """
+                SELECT
+                    COUNT(*) as total_trades,
+                    AVG(CASE WHEN return_percent > 0 THEN 1.0 ELSE 0.0 END) * 100 as win_rate,
+                    AVG(return_percent) as avg_return,
+                    STDDEV(return_percent) as volatility,
+                    MIN(return_percent) as max_drawdown
+                FROM experiments
+                WHERE status = 'closed'
+                AND created_at >= CURRENT_DATE - INTERVAL '30 days'
+            """
+            performance_data = db_manager.execute_query(performance_query)
+            performance = performance_data[0] if performance_data else {}
+        except Exception as e:
+            logger.warning(f"Experiments table not found: {e}")
+            performance = {}
 
-        # Recent activity
-        recent_news = db_manager.execute_query(
-            "SELECT * FROM news WHERE is_significant = true ORDER BY processed_at DESC LIMIT 10"
-        )
-        recent_signals = db_manager.execute_query(
-            "SELECT * FROM signals ORDER BY created_at DESC LIMIT 10"
-        )
-        recent_experiments = db_manager.execute_query(
-            "SELECT * FROM experiments ORDER BY entry_time DESC LIMIT 10"
-        )
+        # Recent activity (use correct table names and handle missing tables)
+        try:
+            recent_news = db_manager.execute_query(
+                "SELECT * FROM news_items WHERE is_significant = true ORDER BY processed_at DESC LIMIT 10"
+            )
+        except:
+            recent_news = []
+
+        try:
+            recent_signals = db_manager.execute_query(
+                "SELECT * FROM trading_signals ORDER BY created_at DESC LIMIT 10"
+            )
+        except:
+            recent_signals = []
+
+        try:
+            recent_experiments = db_manager.execute_query(
+                "SELECT * FROM experiments ORDER BY created_at DESC LIMIT 10"
+            )
+        except:
+            recent_experiments = []
 
         return {
             "portfolio": {
@@ -240,7 +262,7 @@ async def get_dashboard_metrics():
                 "positions_count": portfolio.get('positions_count', 0),
                 "daily_pnl": portfolio.get('realized_pnl_today', 0.0),
                 "total_return": portfolio.get('total_return', 0.0),
-                "alpha_vs_sp500": portfolio.get('alpha_daily', 0.0)
+                "alpha_vs_sp500": portfolio.get('daily_return', 0.0)
             },
             "performance": {
                 "win_rate": performance.get('win_rate', 0.0),
@@ -285,26 +307,26 @@ async def get_system_status():
 @app.get("/api/news")
 async def get_news(limit: int = Query(50, le=100)):
     """Get recent news"""
-    query = "SELECT * FROM news ORDER BY published_at DESC LIMIT %s"
+    query = "SELECT * FROM news_items ORDER BY published_at DESC LIMIT %s"
     return db_manager.execute_query(query, (limit,))
 
 @app.get("/api/news/significant")
 async def get_significant_news(limit: int = Query(20, le=50)):
     """Get recent significant news"""
-    query = "SELECT * FROM news WHERE is_significant = true ORDER BY published_at DESC LIMIT %s"
+    query = "SELECT * FROM news_items WHERE is_significant = true ORDER BY published_at DESC LIMIT %s"
     return db_manager.execute_query(query, (limit,))
 
 @app.get("/api/signals")
 async def get_signals(limit: int = Query(50, le=100)):
     """Get recent signals"""
-    query = "SELECT * FROM signals ORDER BY created_at DESC LIMIT %s"
+    query = "SELECT * FROM trading_signals ORDER BY created_at DESC LIMIT %s"
     return db_manager.execute_query(query, (limit,))
 
 @app.get("/api/signals/active")
 async def get_active_signals():
     """Get active signals"""
     query = """
-        SELECT s.* FROM signals s
+        SELECT s.* FROM trading_signals s
         WHERE s.entry_start <= NOW() AND s.entry_end >= NOW()
         ORDER BY s.created_at DESC
     """
@@ -371,7 +393,7 @@ async def get_wave_analysis():
             COUNT(*) as signal_count,
             AVG(confidence) as avg_confidence,
             AVG(expected_move_percent) as avg_expected_move
-        FROM signals
+        FROM trading_signals
         WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
         GROUP BY wave
         ORDER BY wave
