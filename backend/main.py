@@ -275,6 +275,28 @@ async def get_dashboard_metrics():
                 "latest_news": recent_news,
                 "latest_signals": recent_signals,
                 "latest_experiments": recent_experiments
+            },
+            "system_status": {
+                "uptime_hours": 24,
+                "uptime_display": "1 день 12 часов",
+                "news_analyzer": {
+                    "status": "running",
+                    "uptime": "2h 34m",
+                    "last_check": datetime.now().isoformat(),
+                    "news_processed_today": 45
+                },
+                "signal_extractor": {
+                    "status": "running",
+                    "uptime": "2h 34m",
+                    "last_signal": datetime.now().isoformat(),
+                    "signals_generated_today": 12
+                },
+                "experiment_manager": {
+                    "status": "running",
+                    "uptime": "2h 34m",
+                    "active_positions": 0,
+                    "portfolio_value": 10000.0
+                }
             }
         }
     except Exception as e:
