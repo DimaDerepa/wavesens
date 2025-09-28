@@ -555,6 +555,9 @@ async def broadcast_updates():
 @app.on_event("startup")
 async def startup_event():
     logger.info("WaveSens API Server starting up...")
+    logger.info(f"PORT: {os.getenv('PORT', 'not set')}")
+    logger.info(f"DATABASE_URL: {'set' if os.getenv('DATABASE_URL') else 'not set'}")
+    logger.info(f"Environment: {os.getenv('RAILWAY_ENVIRONMENT', 'unknown')}")
     logger.info("Server initialization complete")
 
 # Health check endpoint

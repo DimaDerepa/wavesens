@@ -1,0 +1,11 @@
+[phases.setup]
+cmds = ["echo 'Setting up backend'"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt"]
+
+[phases.build]
+cmds = ["echo 'Backend build complete'"]
+
+[start]
+cmd = "./start.sh"
