@@ -278,11 +278,10 @@ class ExperimentManagerService:
         try:
             cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             cursor.execute("""
-                SELECT e.*, s.ticker
-                FROM experiments e
-                JOIN signals s ON e.signal_id = s.id
-                WHERE e.status = 'active'
-                ORDER BY e.entry_time
+                SELECT *
+                FROM experiments
+                WHERE status = 'active'
+                ORDER BY created_at
             """)
             return cursor.fetchall()
 

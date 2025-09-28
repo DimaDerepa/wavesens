@@ -287,12 +287,11 @@ class PortfolioManager:
         try:
             cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-            # Получаем данные эксперимента
+            # Получаем данные эксперимента (упрощенная версия без signals)
             cursor.execute("""
-                SELECT e.*, s.ticker
-                FROM experiments e
-                JOIN signals s ON e.signal_id = s.id
-                WHERE e.id = %s AND e.status = 'active'
+                SELECT *
+                FROM experiments
+                WHERE id = %s AND status = 'active'
             """, (experiment_id,))
 
             experiment = cursor.fetchone()
@@ -303,10 +302,10 @@ class PortfolioManager:
             # Получаем текущую цену если не передана
             if current_price is None:
                 execution_data = self.market_data.calculate_realistic_execution_price(
-                    experiment['ticker'], 'SELL', experiment['position_size']
+                    'UNKNOWN', 'SELL', experiment['position_size']
                 )
                 if not execution_data:
-                    logger.error(f"Could not get exit price for {experiment['ticker']}")
+                    logger.error(f"Could not get exit price for position {experiment['id']}")
                     return False
                 exit_price = execution_data['execution_price']
             else:
@@ -362,9 +361,9 @@ class PortfolioManager:
 
             # Логируем результат
             if net_pnl > 0:
-                logger.info(f"📈 CLOSING {experiment['ticker']}:")
+                logger.info(f"📈 CLOSING position {experiment['id']}:")
             else:
-                logger.info(f"📉 CLOSING {experiment['ticker']}:")
+                logger.info(f"📉 CLOSING position {experiment['id']}:")
 
             logger.info(f"  Reason: {exit_reason}")
             logger.info(f"  Exit price: ${exit_price:.2f}")
