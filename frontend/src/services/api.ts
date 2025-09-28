@@ -1,14 +1,20 @@
 import axios from 'axios';
 import { NewsItem, Signal, Experiment, PortfolioSnapshot, SystemStatus, DashboardMetrics } from '../types';
 
-// Try to get backend URL from window object set by backend, fallback to env vars
+// Get backend URL from environment or use localhost for development
 const getApiBaseUrl = () => {
-  // @ts-ignore
-  if (typeof window !== 'undefined' && window.BACKEND_URL) {
-    // @ts-ignore
-    return window.BACKEND_URL;
+  // Check for environment variable first (Railway will set this)
+  if (process.env.REACT_APP_BACKEND_URL) {
+    return process.env.REACT_APP_BACKEND_URL;
   }
-  return process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
+  // Fallback to old env var name
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+
+  // Default for local development
+  return 'http://localhost:8000';
 };
 
 const API_BASE_URL = getApiBaseUrl();
