@@ -277,13 +277,26 @@ class ExperimentManagerService:
         """Получает список активных позиций"""
         try:
             cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+            # Проверяем что таблица exists
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_name = 'experiments'
+                )
+            """)
+            if not cursor.fetchone()[0]:
+                logger.debug("No experiments table found, returning empty list")
+                return []
+
             cursor.execute("""
                 SELECT *
                 FROM experiments
                 WHERE status = 'active'
                 ORDER BY created_at
             """)
-            return cursor.fetchall()
+            results = cursor.fetchall()
+            return results if results else []
 
         except Exception as e:
             logger.error(f"Failed to get active positions: {e}")
