@@ -355,7 +355,9 @@ const Dashboard: React.FC = () => {
           {/* Service Status */}
           <Card title="Service Status & Uptime" loading={loading}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {metrics?.system_status && Object.entries(metrics.system_status).map(([service, status]: [string, any]) => (
+              {metrics?.system_status && Object.entries(metrics.system_status)
+                .filter(([service, status]) => typeof status === 'object' && status.uptime && status.status)
+                .map(([service, status]: [string, any]) => (
                 <div key={service} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.75rem', backgroundColor: '#f9fafb', borderRadius: '0.375rem' }}>
                   <div>
                     <div style={{ fontWeight: '500', textTransform: 'capitalize' }}>{service.replace('_', ' ')}</div>
