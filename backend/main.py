@@ -33,13 +33,22 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS middleware
+# CORS middleware - configure for Railway deployment
+origins = [
+    "http://localhost:3000",
+    "http://localhost:8080",
+    "https://marvelous-upliftment-production.up.railway.app",
+    "https://wavesens-production.up.railway.app",
+    "https://*.railway.app"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify actual origins
+    allow_origins=["*"],  # Allow all origins for Railway
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 # WebSocket connection manager
