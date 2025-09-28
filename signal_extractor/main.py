@@ -58,6 +58,60 @@ class SignalExtractorService:
             self.conn = psycopg2.connect(self.config.DATABASE_URL)
             self.conn.autocommit = True
             logger.info("Database connected")
+
+            # Создаем таблицы если их нет
+            cursor = self.conn.cursor()
+
+            # Создаем news_items если нет
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS news_items (
+                    id SERIAL PRIMARY KEY,
+                    news_id VARCHAR(255) UNIQUE NOT NULL,
+                    headline TEXT NOT NULL,
+                    summary TEXT,
+                    url VARCHAR(500),
+                    published_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    significance_score DECIMAL(3,2),
+                    reasoning TEXT,
+                    is_significant BOOLEAN DEFAULT FALSE,
+                    processed_by_block2 BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """)
+
+            # Добавляем processed_by_block2 если ее нет
+            cursor.execute("""
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_name = 'news_items' AND column_name = 'processed_by_block2'
+            """)
+
+            if not cursor.fetchone():
+                try:
+                    cursor.execute("ALTER TABLE news_items ADD COLUMN processed_by_block2 BOOLEAN DEFAULT FALSE")
+                    logger.info("Added processed_by_block2 column to news_items")
+                except Exception as e:
+                    logger.debug(f"Could not add processed_by_block2 column: {e}")
+
+            # Создаем trading_signals если нет
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS trading_signals (
+                    id SERIAL PRIMARY KEY,
+                    news_item_id INTEGER REFERENCES news_items(id),
+                    signal_type VARCHAR(20) NOT NULL CHECK (signal_type IN ('BUY', 'SELL', 'HOLD')),
+                    confidence DECIMAL(3,2) NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+                    elliott_wave INTEGER NOT NULL CHECK (elliott_wave >= 0 AND elliott_wave <= 6),
+                    wave_description TEXT NOT NULL,
+                    reasoning TEXT NOT NULL,
+                    market_conditions JSONB,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """)
+
+            cursor.close()
+            logger.info("Database tables initialized")
+
         except Exception as e:
             logger.error(f"Database connection failed: {e}")
             raise
@@ -189,7 +243,7 @@ class SignalExtractorService:
             cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             cursor.execute("""
                 SELECT id, headline, summary, published_at, significance_score, reasoning, processed_by_block2
-                FROM news
+                FROM news_items
                 WHERE id = %s AND is_significant = TRUE
             """, (news_id,))
 
@@ -267,31 +321,26 @@ class SignalExtractorService:
                 wave_timing = self._calculate_entry_timing(wave)
 
                 cursor.execute("""
-                    INSERT INTO signals (
-                        news_id, ticker, action, wave,
-                        entry_start, entry_optimal, entry_end,
-                        expected_move_percent, confidence,
-                        stop_loss_percent, take_profit_percent, max_hold_hours,
-                        is_optimal_wave, reasoning,
-                        ticker_validated, ticker_exists
-                    ) VALUES (
-                        %s, %s, %s, %s,
-                        %s, %s, %s,
-                        %s, %s,
-                        %s, %s, %s,
-                        %s, %s,
-                        %s, %s
-                    )
+                    INSERT INTO trading_signals (
+                        news_item_id, signal_type, confidence, elliott_wave,
+                        wave_description, reasoning, market_conditions
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """, (
-                    news_id, signal['ticker'], signal['action'], wave,
-                    wave_timing['entry_start'], wave_timing['entry_optimal'], wave_timing['entry_end'],
-                    signal['expected_move'], signal['confidence'],
-                    self.config.DEFAULT_STOP_LOSS_PERCENT,
-                    self.config.DEFAULT_TAKE_PROFIT_PERCENT,
-                    self.config.DEFAULT_MAX_HOLD_HOURS,
-                    True,  # is_optimal_wave
+                    news_id,
+                    signal['action'],  # BUY/SELL/HOLD
+                    signal['confidence'] / 100.0,  # Convert to 0-1 range
+                    wave,
+                    f"Wave {wave} - {signal.get('wave_description', 'Elliott Wave analysis')}",
                     signal['reasoning'],
-                    signal['ticker_validated'], signal['ticker_exists']
+                    {
+                        'ticker': signal['ticker'],
+                        'expected_move': signal.get('expected_move', 0),
+                        'stop_loss_percent': self.config.DEFAULT_STOP_LOSS_PERCENT,
+                        'take_profit_percent': self.config.DEFAULT_TAKE_PROFIT_PERCENT,
+                        'max_hold_hours': self.config.DEFAULT_MAX_HOLD_HOURS,
+                        'ticker_validated': signal.get('ticker_validated', True),
+                        'ticker_exists': signal.get('ticker_exists', True)
+                    }
                 ))
                 saved_count += 1
 
@@ -307,7 +356,7 @@ class SignalExtractorService:
         try:
             cursor = self.conn.cursor()
             cursor.execute("""
-                UPDATE news
+                UPDATE news_items
                 SET processed_by_block2 = TRUE,
                     block2_processed_at = NOW(),
                     block2_skip_reason = %s
@@ -400,7 +449,7 @@ class SignalExtractorService:
         try:
             cursor = self.conn.cursor()
             cursor.execute("""
-                SELECT id FROM news
+                SELECT id FROM news_items
                 WHERE is_significant = TRUE
                   AND processed_by_block2 = FALSE
                 ORDER BY processed_at DESC
