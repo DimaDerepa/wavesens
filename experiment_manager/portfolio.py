@@ -62,6 +62,33 @@ class PortfolioManager:
                 )
             """)
 
+            # News items таблица (если ее нет)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS news_items (
+                    id SERIAL PRIMARY KEY,
+                    news_id VARCHAR(255) UNIQUE NOT NULL,
+                    headline TEXT NOT NULL,
+                    published_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    significance_score DECIMAL(3,2),
+                    is_significant BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """)
+
+            # Trading signals таблица (если ее нет)
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS trading_signals (
+                    id SERIAL PRIMARY KEY,
+                    news_item_id INTEGER REFERENCES news_items(id),
+                    signal_type VARCHAR(20) NOT NULL CHECK (signal_type IN ('BUY', 'SELL', 'HOLD')),
+                    confidence DECIMAL(3,2) NOT NULL CHECK (confidence >= 0 AND confidence <= 1),
+                    elliott_wave INTEGER NOT NULL CHECK (elliott_wave >= 0 AND elliott_wave <= 6),
+                    wave_description TEXT NOT NULL,
+                    reasoning TEXT NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """)
+
             # Индексы
             cursor.execute("""
                 CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_timestamp
@@ -117,7 +144,7 @@ class PortfolioManager:
                 'unrealized_pnl': unrealized_pnl,
                 'realized_pnl_today': snapshot['realized_pnl_today'],
                 'realized_pnl_total': snapshot['realized_pnl_total'],
-                'daily_return': ((current_value / snapshot['total_value']) - 1) * 100 if snapshot['total_value'] > 0 else 0,
+                'daily_return': float(((current_value / snapshot['total_value']) - 1) * 100) if snapshot['total_value'] > 0 else 0,
                 'total_return': ((current_value / self.config.INITIAL_CAPITAL) - 1) * 100,
                 'available_cash': snapshot['cash_balance'],
                 'last_updated': snapshot['timestamp']
@@ -356,22 +383,20 @@ class PortfolioManager:
         """Рассчитывает нереализованную прибыль/убыток"""
         try:
             cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+            # Упрощенная версия без связи с signals
             cursor.execute("""
-                SELECT e.id, e.entry_price, e.shares, e.position_size, s.ticker
-                FROM experiments e
-                JOIN signals s ON e.signal_id = s.id
-                WHERE e.status = 'active'
+                SELECT id, name, position_size
+                FROM experiments
+                WHERE status = 'active'
             """)
 
             active_positions = cursor.fetchall()
             total_unrealized = 0
 
             for position in active_positions:
-                current_price = self.market_data.get_current_price(position['ticker'])
-                if current_price:
-                    current_value = position['shares'] * current_price
-                    unrealized = current_value - position['position_size']
-                    total_unrealized += unrealized
+                # Временно возвращаем 0 так как нет tickers в experiments
+                # TODO: добавить ticker в experiments или другую логику
+                pass
 
             return total_unrealized
 
@@ -410,19 +435,18 @@ class PortfolioManager:
         """Создает снимок портфеля"""
         try:
             portfolio = self.get_portfolio_status()
-            sp500_price = self.market_data.get_benchmark_price('SPY')
 
             cursor = self.conn.cursor()
             cursor.execute("""
                 INSERT INTO portfolio_snapshots (
                     total_value, cash_balance, positions_count,
                     unrealized_pnl, realized_pnl_today, realized_pnl_total,
-                    daily_return, total_return, sp500_price
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    daily_return, total_return
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """, (
                 portfolio['total_value'], portfolio['cash_balance'], portfolio['positions_count'],
                 portfolio['unrealized_pnl'], portfolio['realized_pnl_today'], portfolio['realized_pnl_total'],
-                portfolio['daily_return'], portfolio['total_return'], sp500_price
+                portfolio['daily_return'], portfolio['total_return']
             ))
 
             logger.debug(f"Portfolio snapshot created: ${portfolio['total_value']:.2f}")
@@ -436,11 +460,11 @@ class PortfolioManager:
             cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
             # Позиции с превышением времени удержания
+            # Упрощенная версия без связи с signals
             cursor.execute("""
-                SELECT e.*, s.ticker
-                FROM experiments e
-                JOIN signals s ON e.signal_id = s.id
-                WHERE e.status = 'active' AND e.max_hold_until < NOW()
+                SELECT *
+                FROM experiments
+                WHERE status = 'active'
             """)
             time_expired = cursor.fetchall()
 
