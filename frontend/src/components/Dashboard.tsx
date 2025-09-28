@@ -12,6 +12,7 @@ const Dashboard: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [portfolioData, setPortfolioData] = useState<any[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<string>('DISCONNECTED');
+  const [waveAnalysis, setWaveAnalysis] = useState<any>(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -25,12 +26,14 @@ const Dashboard: React.FC = () => {
     try {
       console.log('📊 Loading dashboard data...');
       setLoading(true);
-      const [dashboardMetrics, portfolioSnapshots] = await Promise.all([
+      const [dashboardMetrics, portfolioSnapshots, waveData] = await Promise.all([
         apiService.getDashboardMetrics(),
-        apiService.getPortfolioSnapshots(24)
+        apiService.getPortfolioSnapshots(24),
+        apiService.getWaveAnalysis()
       ]);
 
       setMetrics(dashboardMetrics);
+      setWaveAnalysis(waveData);
       setPortfolioData(portfolioSnapshots.map(snap => ({
         time: new Date(snap.timestamp).toLocaleTimeString(),
         portfolio: snap.total_value,
@@ -211,13 +214,13 @@ const Dashboard: React.FC = () => {
                       style={{
                         height: '0.5rem',
                         borderRadius: '9999px',
-                        width: `${Math.random() * 80 + 10}%`,
+                        width: `${waveAnalysis?.[wave]?.percentage || 0}%`,
                         backgroundColor: getWaveColor(wave)
                       }}
                     />
                   </div>
                   <div style={{ width: '3rem', fontSize: '0.875rem', color: '#6b7280' }}>
-                    {Math.floor(Math.random() * 20 + 1)}
+                    {waveAnalysis?.[wave]?.count || 0}
                   </div>
                 </div>
               ))}
