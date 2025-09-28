@@ -300,7 +300,7 @@ class ExperimentManagerService:
             # Рассчитываем текущую P&L
             current_value = position['shares'] * current_price
             unrealized_pnl = current_value - position['position_size']
-            unrealized_percent = (unrealized_pnl / position['position_size']) * 100
+            unrealized_percent = float(unrealized_pnl / position['position_size']) * 100
 
             logger.debug(f"Position update: {position['ticker']}")
             logger.debug(f"  Current price: ${current_price:.2f}")
