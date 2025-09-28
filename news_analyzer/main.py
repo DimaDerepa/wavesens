@@ -10,8 +10,6 @@ import logging
 from datetime import datetime, timezone, timedelta
 
 # Setup database logging FIRST, before any other logging
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
     from shared_logging import setup_database_logging
     setup_database_logging("news_analyzer")
