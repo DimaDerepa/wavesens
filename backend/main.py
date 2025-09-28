@@ -137,8 +137,21 @@ def get_db_manager():
             logger.info("Database manager initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize database manager: {e}")
-            db_manager = None
+            # Don't set db_manager to None, let it try again next time
+            return None
     return db_manager
+
+def safe_db_query(query: str, params: tuple = None, default=None):
+    """Execute database query with safe error handling"""
+    try:
+        db = get_db_manager()
+        if db is None:
+            logger.warning("Database manager not available, returning default")
+            return default or []
+        return db.execute_query(query, params)
+    except Exception as e:
+        logger.error(f"Database query failed: {e}")
+        return default or []
 
 # Pydantic models
 class NewsItem(BaseModel):
@@ -228,7 +241,7 @@ async def get_dashboard_metrics():
                 ORDER BY timestamp DESC
                 LIMIT 1
             """
-            portfolio_data = get_db_manager().execute_query(portfolio_query)
+            portfolio_data = safe_db_query(portfolio_query)
             portfolio = portfolio_data[0] if portfolio_data else {}
         except Exception as e:
             logger.warning(f"Portfolio snapshots table not found: {e}")
@@ -248,7 +261,7 @@ async def get_dashboard_metrics():
                 WHERE status = 'closed'
                 AND created_at >= CURRENT_DATE - INTERVAL '30 days'
             """
-            performance_data = get_db_manager().execute_query(performance_query)
+            performance_data = safe_db_query(performance_query)
             performance = performance_data[0] if performance_data else {}
         except Exception as e:
             logger.warning(f"Experiments table not found: {e}")
@@ -256,21 +269,21 @@ async def get_dashboard_metrics():
 
         # Recent activity (use correct table names and handle missing tables)
         try:
-            recent_news = get_db_manager().execute_query(
+            recent_news = safe_db_query(
                 "SELECT * FROM news_items WHERE is_significant = true ORDER BY processed_at DESC LIMIT 10"
             )
         except:
             recent_news = []
 
         try:
-            recent_signals = get_db_manager().execute_query(
+            recent_signals = safe_db_query(
                 "SELECT * FROM trading_signals ORDER BY created_at DESC LIMIT 10"
             )
         except:
             recent_signals = []
 
         try:
-            recent_experiments = get_db_manager().execute_query(
+            recent_experiments = safe_db_query(
                 "SELECT * FROM experiments ORDER BY created_at DESC LIMIT 10"
             )
         except:
@@ -353,19 +366,19 @@ async def get_system_status():
 async def get_news(limit: int = Query(50, le=100)):
     """Get recent news"""
     query = "SELECT * FROM news_items ORDER BY published_at DESC LIMIT %s"
-    return get_db_manager().execute_query(query, (limit,))
+    return safe_db_query(query, (limit,))
 
 @app.get("/api/news/significant")
 async def get_significant_news(limit: int = Query(20, le=50)):
     """Get recent significant news"""
     query = "SELECT * FROM news_items WHERE is_significant = true ORDER BY published_at DESC LIMIT %s"
-    return get_db_manager().execute_query(query, (limit,))
+    return safe_db_query(query, (limit,))
 
 @app.get("/api/signals")
 async def get_signals(limit: int = Query(50, le=100)):
     """Get recent signals"""
     query = "SELECT * FROM trading_signals ORDER BY created_at DESC LIMIT %s"
-    return get_db_manager().execute_query(query, (limit,))
+    return safe_db_query(query, (limit,))
 
 @app.get("/api/signals/active")
 async def get_active_signals():
@@ -375,25 +388,25 @@ async def get_active_signals():
         WHERE s.entry_start <= NOW() AND s.entry_end >= NOW()
         ORDER BY s.created_at DESC
     """
-    return get_db_manager().execute_query(query)
+    return safe_db_query(query)
 
 @app.get("/api/experiments")
 async def get_experiments(limit: int = Query(50, le=100)):
     """Get recent experiments"""
     query = "SELECT * FROM experiments ORDER BY entry_time DESC LIMIT %s"
-    return get_db_manager().execute_query(query, (limit,))
+    return safe_db_query(query, (limit,))
 
 @app.get("/api/experiments/active")
 async def get_active_experiments():
     """Get active experiments"""
     query = "SELECT * FROM experiments WHERE status = 'active' ORDER BY entry_time DESC"
-    return get_db_manager().execute_query(query)
+    return safe_db_query(query)
 
 @app.get("/api/experiments/closed")
 async def get_closed_experiments(limit: int = Query(50, le=100)):
     """Get closed experiments"""
     query = "SELECT * FROM experiments WHERE status = 'closed' ORDER BY exit_time DESC LIMIT %s"
-    return get_db_manager().execute_query(query, (limit,))
+    return safe_db_query(query, (limit,))
 
 @app.get("/api/portfolio/snapshots")
 async def get_portfolio_snapshots(hours: int = Query(24, le=168)):
@@ -403,13 +416,13 @@ async def get_portfolio_snapshots(hours: int = Query(24, le=168)):
         WHERE timestamp >= NOW() - INTERVAL '%s hours'
         ORDER BY timestamp ASC
     """
-    return get_db_manager().execute_query(query, (hours,))
+    return safe_db_query(query, (hours,))
 
 @app.get("/api/portfolio/current")
 async def get_current_portfolio():
     """Get current portfolio status"""
     query = "SELECT * FROM portfolio_snapshots ORDER BY timestamp DESC LIMIT 1"
-    data = get_db_manager().execute_query(query)
+    data = safe_db_query(query)
     return data[0] if data else {}
 
 @app.get("/api/performance/metrics")
@@ -428,7 +441,7 @@ async def get_performance_metrics(days: int = Query(30, le=365)):
             WHERE status = 'closed'
             AND exit_time >= CURRENT_DATE - INTERVAL '%s days'
         """
-        return get_db_manager().execute_query(query, (days,))
+        return safe_db_query(query, (days,))
     except Exception as e:
         logger.error(f"Performance metrics query error: {e}")
         return [{
@@ -446,7 +459,7 @@ async def get_wave_analysis():
     try:
         # Check if trading_signals table exists and has data
         test_query = "SELECT COUNT(*) FROM trading_signals LIMIT 1"
-        get_db_manager().execute_query(test_query)
+        safe_db_query(test_query)
 
         # Try alternative query without 'wave' column
         query = """
@@ -458,7 +471,7 @@ async def get_wave_analysis():
             FROM trading_signals
             WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
         """
-        result = get_db_manager().execute_query(query)
+        result = safe_db_query(query)
 
         # If we have data, distribute it across 5 waves
         if result and result[0]['signal_count'] > 0:
@@ -494,7 +507,7 @@ async def get_pnl_history(days: int = Query(30, le=365)):
         GROUP BY DATE(exit_time)
         ORDER BY date
     """
-    return get_db_manager().execute_query(query, (days,))
+    return safe_db_query(query, (days,))
 
 # WebSocket endpoint
 @app.websocket("/ws")
