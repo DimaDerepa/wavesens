@@ -24,6 +24,57 @@ class PortfolioManager:
             self.conn = psycopg2.connect(self.config.DATABASE_URL)
             self.conn.autocommit = True
             logger.info("Portfolio database connected")
+
+            # Создаем таблицы если их нет
+            cursor = self.conn.cursor()
+
+            # Portfolio snapshots таблица
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS portfolio_snapshots (
+                    id SERIAL PRIMARY KEY,
+                    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW() UNIQUE,
+                    total_value DECIMAL(12,2) NOT NULL,
+                    cash_balance DECIMAL(12,2) NOT NULL,
+                    positions_count INTEGER DEFAULT 0,
+                    unrealized_pnl DECIMAL(12,2) DEFAULT 0,
+                    realized_pnl_today DECIMAL(12,2) DEFAULT 0,
+                    realized_pnl_total DECIMAL(12,2) DEFAULT 0,
+                    daily_return DECIMAL(8,4) DEFAULT 0,
+                    total_return DECIMAL(8,4) DEFAULT 0
+                )
+            """)
+
+            # Experiments таблица
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS experiments (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL,
+                    description TEXT,
+                    start_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                    end_date DATE NOT NULL DEFAULT (CURRENT_DATE + INTERVAL '30 days'),
+                    initial_balance DECIMAL(12,2) NOT NULL DEFAULT 10000,
+                    current_balance DECIMAL(12,2) NOT NULL DEFAULT 10000,
+                    status VARCHAR(20) DEFAULT 'active',
+                    position_size DECIMAL(12,2) DEFAULT 0,
+                    settings JSONB,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """)
+
+            # Индексы
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_portfolio_snapshots_timestamp
+                ON portfolio_snapshots(timestamp)
+            """)
+            cursor.execute("""
+                CREATE INDEX IF NOT EXISTS idx_experiments_status
+                ON experiments(status)
+            """)
+
+            cursor.close()
+            logger.info("Database tables initialized")
+
         except Exception as e:
             logger.error(f"Portfolio database connection failed: {e}")
             raise
