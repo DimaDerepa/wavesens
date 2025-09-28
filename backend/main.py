@@ -126,7 +126,19 @@ class DatabaseManager:
             if conn:
                 conn.close()
 
-db_manager = DatabaseManager()
+# Initialize db_manager as None, will be created on first use
+db_manager = None
+
+def get_db_manager():
+    global db_manager
+    if db_manager is None:
+        try:
+            db_manager = DatabaseManager()
+            logger.info("Database manager initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize database manager: {e}")
+            db_manager = None
+    return db_manager
 
 # Pydantic models
 class NewsItem(BaseModel):
@@ -216,7 +228,7 @@ async def get_dashboard_metrics():
                 ORDER BY timestamp DESC
                 LIMIT 1
             """
-            portfolio_data = db_manager.execute_query(portfolio_query)
+            portfolio_data = get_db_manager().execute_query(portfolio_query)
             portfolio = portfolio_data[0] if portfolio_data else {}
         except Exception as e:
             logger.warning(f"Portfolio snapshots table not found: {e}")
@@ -236,7 +248,7 @@ async def get_dashboard_metrics():
                 WHERE status = 'closed'
                 AND created_at >= CURRENT_DATE - INTERVAL '30 days'
             """
-            performance_data = db_manager.execute_query(performance_query)
+            performance_data = get_db_manager().execute_query(performance_query)
             performance = performance_data[0] if performance_data else {}
         except Exception as e:
             logger.warning(f"Experiments table not found: {e}")
@@ -244,21 +256,21 @@ async def get_dashboard_metrics():
 
         # Recent activity (use correct table names and handle missing tables)
         try:
-            recent_news = db_manager.execute_query(
+            recent_news = get_db_manager().execute_query(
                 "SELECT * FROM news_items WHERE is_significant = true ORDER BY processed_at DESC LIMIT 10"
             )
         except:
             recent_news = []
 
         try:
-            recent_signals = db_manager.execute_query(
+            recent_signals = get_db_manager().execute_query(
                 "SELECT * FROM trading_signals ORDER BY created_at DESC LIMIT 10"
             )
         except:
             recent_signals = []
 
         try:
-            recent_experiments = db_manager.execute_query(
+            recent_experiments = get_db_manager().execute_query(
                 "SELECT * FROM experiments ORDER BY created_at DESC LIMIT 10"
             )
         except:
@@ -341,19 +353,19 @@ async def get_system_status():
 async def get_news(limit: int = Query(50, le=100)):
     """Get recent news"""
     query = "SELECT * FROM news_items ORDER BY published_at DESC LIMIT %s"
-    return db_manager.execute_query(query, (limit,))
+    return get_db_manager().execute_query(query, (limit,))
 
 @app.get("/api/news/significant")
 async def get_significant_news(limit: int = Query(20, le=50)):
     """Get recent significant news"""
     query = "SELECT * FROM news_items WHERE is_significant = true ORDER BY published_at DESC LIMIT %s"
-    return db_manager.execute_query(query, (limit,))
+    return get_db_manager().execute_query(query, (limit,))
 
 @app.get("/api/signals")
 async def get_signals(limit: int = Query(50, le=100)):
     """Get recent signals"""
     query = "SELECT * FROM trading_signals ORDER BY created_at DESC LIMIT %s"
-    return db_manager.execute_query(query, (limit,))
+    return get_db_manager().execute_query(query, (limit,))
 
 @app.get("/api/signals/active")
 async def get_active_signals():
@@ -363,25 +375,25 @@ async def get_active_signals():
         WHERE s.entry_start <= NOW() AND s.entry_end >= NOW()
         ORDER BY s.created_at DESC
     """
-    return db_manager.execute_query(query)
+    return get_db_manager().execute_query(query)
 
 @app.get("/api/experiments")
 async def get_experiments(limit: int = Query(50, le=100)):
     """Get recent experiments"""
     query = "SELECT * FROM experiments ORDER BY entry_time DESC LIMIT %s"
-    return db_manager.execute_query(query, (limit,))
+    return get_db_manager().execute_query(query, (limit,))
 
 @app.get("/api/experiments/active")
 async def get_active_experiments():
     """Get active experiments"""
     query = "SELECT * FROM experiments WHERE status = 'active' ORDER BY entry_time DESC"
-    return db_manager.execute_query(query)
+    return get_db_manager().execute_query(query)
 
 @app.get("/api/experiments/closed")
 async def get_closed_experiments(limit: int = Query(50, le=100)):
     """Get closed experiments"""
     query = "SELECT * FROM experiments WHERE status = 'closed' ORDER BY exit_time DESC LIMIT %s"
-    return db_manager.execute_query(query, (limit,))
+    return get_db_manager().execute_query(query, (limit,))
 
 @app.get("/api/portfolio/snapshots")
 async def get_portfolio_snapshots(hours: int = Query(24, le=168)):
@@ -391,13 +403,13 @@ async def get_portfolio_snapshots(hours: int = Query(24, le=168)):
         WHERE timestamp >= NOW() - INTERVAL '%s hours'
         ORDER BY timestamp ASC
     """
-    return db_manager.execute_query(query, (hours,))
+    return get_db_manager().execute_query(query, (hours,))
 
 @app.get("/api/portfolio/current")
 async def get_current_portfolio():
     """Get current portfolio status"""
     query = "SELECT * FROM portfolio_snapshots ORDER BY timestamp DESC LIMIT 1"
-    data = db_manager.execute_query(query)
+    data = get_db_manager().execute_query(query)
     return data[0] if data else {}
 
 @app.get("/api/performance/metrics")
@@ -416,7 +428,7 @@ async def get_performance_metrics(days: int = Query(30, le=365)):
             WHERE status = 'closed'
             AND exit_time >= CURRENT_DATE - INTERVAL '%s days'
         """
-        return db_manager.execute_query(query, (days,))
+        return get_db_manager().execute_query(query, (days,))
     except Exception as e:
         logger.error(f"Performance metrics query error: {e}")
         return [{
@@ -434,7 +446,7 @@ async def get_wave_analysis():
     try:
         # Check if trading_signals table exists and has data
         test_query = "SELECT COUNT(*) FROM trading_signals LIMIT 1"
-        db_manager.execute_query(test_query)
+        get_db_manager().execute_query(test_query)
 
         # Try alternative query without 'wave' column
         query = """
@@ -446,7 +458,7 @@ async def get_wave_analysis():
             FROM trading_signals
             WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
         """
-        result = db_manager.execute_query(query)
+        result = get_db_manager().execute_query(query)
 
         # If we have data, distribute it across 5 waves
         if result and result[0]['signal_count'] > 0:
@@ -482,7 +494,7 @@ async def get_pnl_history(days: int = Query(30, le=365)):
         GROUP BY DATE(exit_time)
         ORDER BY date
     """
-    return db_manager.execute_query(query, (days,))
+    return get_db_manager().execute_query(query, (days,))
 
 # WebSocket endpoint
 @app.websocket("/ws")
@@ -530,8 +542,7 @@ async def broadcast_updates():
 @app.on_event("startup")
 async def startup_event():
     logger.info("WaveSens API Server starting up...")
-    # Start background broadcasting task
-    asyncio.create_task(broadcast_updates())
+    logger.info("Server initialization complete")
 
 # Health check endpoint
 @app.get("/api/system/tokens")
@@ -568,13 +579,22 @@ async def change_model(model_data: dict):
 
 @app.get("/health")
 async def health_check():
+    """Basic health check without database dependency"""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+
+@app.get("/health/db")
+async def health_check_db():
+    """Health check with database connection"""
     try:
-        # Test database connection
-        db_manager.execute_query("SELECT 1")
-        return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+        db = get_db_manager()
+        if db is None:
+            return {"status": "unhealthy", "database": "disconnected", "error": "Database manager not initialized", "timestamp": datetime.now().isoformat()}
+
+        db.execute_query("SELECT 1")
+        return {"status": "healthy", "database": "connected", "timestamp": datetime.now().isoformat()}
     except Exception as e:
-        logger.error(f"Health check failed: {e}")
-        raise HTTPException(status_code=503, detail="Service unhealthy")
+        logger.error(f"Database health check failed: {e}")
+        return {"status": "unhealthy", "database": "disconnected", "error": str(e), "timestamp": datetime.now().isoformat()}
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
