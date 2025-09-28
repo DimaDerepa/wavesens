@@ -15,7 +15,17 @@ class WebSocketService {
   private url: string;
 
   constructor() {
-    this.url = process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
+    // Try to get WS URL from window object set by backend, fallback to env vars
+    const getWsUrl = () => {
+      // @ts-ignore
+      if (typeof window !== 'undefined' && window.BACKEND_WS_URL) {
+        // @ts-ignore
+        return window.BACKEND_WS_URL;
+      }
+      return process.env.REACT_APP_WS_URL || 'ws://localhost:8000/ws';
+    };
+
+    this.url = getWsUrl();
     this.initializeEventTypes();
   }
 

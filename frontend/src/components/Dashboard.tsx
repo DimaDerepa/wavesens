@@ -19,7 +19,7 @@ const Dashboard: React.FC = () => {
 
     const interval = setInterval(loadDashboardData, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadDashboardData = async () => {
     try {

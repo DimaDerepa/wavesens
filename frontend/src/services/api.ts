@@ -1,7 +1,17 @@
 import axios from 'axios';
 import { NewsItem, Signal, Experiment, PortfolioSnapshot, SystemStatus, DashboardMetrics } from '../types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+// Try to get backend URL from window object set by backend, fallback to env vars
+const getApiBaseUrl = () => {
+  // @ts-ignore
+  if (typeof window !== 'undefined' && window.BACKEND_URL) {
+    // @ts-ignore
+    return window.BACKEND_URL;
+  }
+  return process.env.REACT_APP_API_URL || 'http://localhost:8000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const api = axios.create({
   baseURL: API_BASE_URL,
