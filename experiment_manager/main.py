@@ -13,6 +13,15 @@ import threading
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List
 
+# Setup database logging FIRST, before any other logging
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+try:
+    from shared_logging import setup_database_logging
+    setup_database_logging("experiment_manager")
+except Exception as e:
+    print(f"Could not setup database logging: {e}")
+
 from config import Config
 from market_data import MarketDataProvider
 from portfolio import PortfolioManager
