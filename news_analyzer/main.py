@@ -110,6 +110,15 @@ class NewsAnalyzerService:
             url = item.get('url', '')
             published_at = datetime.fromtimestamp(item['datetime'], tz=timezone.utc)
 
+            # ВРЕМЕННЫЙ DEBUG - проверим первые 3 новости подробно
+            if news_id in ['finnhub:7520222', 'finnhub:7520221', 'finnhub:7520218']:
+                hours_old = (datetime.now(timezone.utc) - published_at).total_seconds() / 3600
+                logger.info(f"🔍 DEBUG {news_id}: age={hours_old:.1f}h, published={published_at}")
+                dup_result = self.storage.is_duplicate(news_id)
+                logger.info(f"🔍 DEBUG {news_id}: duplicate_check={dup_result}")
+                if not dup_result:
+                    logger.info(f"🔍 DEBUG {news_id}: SHOULD BE NEW! Processing...")
+
             # Проверки
             if self.storage.is_duplicate(news_id):
                 logger.debug(f"Skipping duplicate: {news_id} already processed")
