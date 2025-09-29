@@ -20,28 +20,46 @@ class NewsSignificanceSignature(dspy.Signature):
 
 class NewsAnalyzer:
     def __init__(self, openrouter_api_key, model_name, temperature):
-        # Настраиваем litellm для корректной работы с OpenRouter
+        # Полная конфигурация litellm для исправления всех ошибок
         try:
             import litellm
-            litellm.drop_params = True  # Отбрасываем неподдерживаемые параметры
-        except ImportError:
-            logger.warning("litellm not available for configuration")
+            # Все возможные исправления для OpenRouter
+            litellm.drop_params = True
+            litellm.turn_off_message_logging = True
 
-        # Конфигурация DSPy для OpenRouter без проблемных параметров
+            # Отключаем все проблемные параметры
+            if hasattr(litellm, 'client_kwargs'):
+                litellm.client_kwargs = {}
+
+            # Настройки для OpenRouter
+            litellm.set_verbose = False
+
+            # Принудительно отключаем proxies в любых вариантах
+            import os
+            for proxy_var in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']:
+                if proxy_var in os.environ:
+                    del os.environ[proxy_var]
+
+            logger.info("litellm configured with all proxies fixes")
+
+        except Exception as e:
+            logger.warning(f"litellm configuration warning: {e}")
+
+        # Конфигурация DSPy для OpenRouter с минимальными параметрами
         try:
+            # Используем только базовые параметры без проблемных настроек
             self.lm = dspy.LM(
                 model=f"openrouter/{model_name}",
                 api_key=openrouter_api_key,
                 api_base="https://openrouter.ai/api/v1",
                 temperature=temperature,
-                max_tokens=1000,
-                cache=False
+                max_tokens=1000
             )
 
             # Устанавливаем модель для DSPy
             dspy.configure(lm=self.lm)
 
-            logger.info(f"DSPy configured with OpenRouter model: {model_name}")
+            logger.info(f"DSPy configured successfully with model: {model_name}")
 
         except Exception as e:
             logger.error(f"DSPy configuration failed: {e}")
