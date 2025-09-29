@@ -1,84 +1,12 @@
 #!/usr/bin/env python3
 """
-LLM analyzer for news significance - Custom DSPy OpenRouter client
+LLM analyzer for news significance - Proper DSPy configuration
 """
 import dspy
 import logging
 import os
-import requests
-import json
-from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
-
-class CustomOpenRouterLM(dspy.LM):
-    """Custom OpenRouter LM that bypasses litellm completely"""
-
-    def __init__(self, model: str, api_key: str, temperature: float = 0.3, max_tokens: int = 1000):
-        self.model = model.replace("openrouter/", "")
-        self.api_key = api_key
-        self.temperature = temperature
-        self.max_tokens = max_tokens
-        self.api_url = "https://openrouter.ai/api/v1/chat/completions"
-
-        # DSPy compatibility attributes
-        self.model_name = model
-        self.provider = "openrouter"
-        self.kwargs = {}
-        self.cache = {}
-
-        logger.info(f"CustomOpenRouterLM initialized with model: {self.model}")
-
-    def __call__(self, prompt, **kwargs):
-        """Direct OpenRouter API call without litellm"""
-        try:
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://wavesens-trading.app",
-                "X-Title": "WaveSens News Analyzer"
-            }
-
-            # Convert prompt to messages format
-            if isinstance(prompt, str):
-                messages = [{"role": "user", "content": prompt}]
-            else:
-                messages = prompt
-
-            data = {
-                "model": self.model,
-                "messages": messages,
-                "temperature": kwargs.get('temperature', self.temperature),
-                "max_tokens": kwargs.get('max_tokens', self.max_tokens)
-            }
-
-            response = requests.post(
-                self.api_url,
-                headers=headers,
-                json=data,
-                timeout=30
-            )
-
-            if response.status_code != 200:
-                error_msg = f"OpenRouter API error: {response.status_code} - {response.text}"
-                logger.error(error_msg)
-                raise Exception(error_msg)
-
-            result = response.json()
-
-            if 'choices' not in result or not result['choices']:
-                error_msg = f"Invalid API response: {result}"
-                logger.error(error_msg)
-                raise Exception(error_msg)
-
-            content = result['choices'][0]['message']['content']
-
-            # Return in DSPy expected format
-            return [content]
-
-        except Exception as e:
-            logger.error(f"CustomOpenRouterLM call failed: {e}")
-            raise e
 
 class NewsSignificanceSignature(dspy.Signature):
     """Оценка значимости новости для финансовых рынков"""
@@ -92,25 +20,29 @@ class NewsSignificanceSignature(dspy.Signature):
 
 class NewsAnalyzer:
     def __init__(self, openrouter_api_key, model_name, temperature):
-        # Используем кастомный OpenRouter client без litellm
+        # Правильная конфигурация DSPy с OpenRouter
         try:
-            self.lm = CustomOpenRouterLM(
-                model=model_name,
-                api_key=openrouter_api_key,
+            # Настраиваем переменную окружения
+            os.environ['OPENROUTER_API_KEY'] = openrouter_api_key
+
+            # Создаем LM правильно
+            lm = dspy.LM(
+                model=f"openrouter/{model_name}",
                 temperature=temperature,
                 max_tokens=1000
             )
 
-            # Устанавливаем кастомную модель для DSPy
-            dspy.configure(lm=self.lm)
+            # Конфигурируем DSPy правильно
+            dspy.settings.configure(lm=lm)
 
-            logger.info(f"Custom OpenRouter LM configured successfully with model: {model_name}")
+            logger.info(f"DSPy configured correctly with OpenRouter model: {model_name}")
 
         except Exception as e:
-            logger.error(f"Custom OpenRouter LM configuration failed: {e}")
+            logger.error(f"DSPy configuration failed: {e}")
             raise e
 
-        self.predictor = dspy.Predict(NewsSignificanceSignature)
+        # Создаем предиктор с переопределением температуры
+        self.predictor = dspy.Predict(NewsSignificanceSignature, temperature=temperature)
 
     def analyze(self, headline, summary):
         """Анализ значимости новости"""
