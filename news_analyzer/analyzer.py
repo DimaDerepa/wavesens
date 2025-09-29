@@ -1,110 +1,114 @@
 #!/usr/bin/env python3
 """
-LLM analyzer for news significance - Direct OpenRouter API calls
+LLM analyzer for news significance - DSPy with proper OpenRouter configuration
 """
-import requests
-import json
+import dspy
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
+class NewsSignificanceSignature(dspy.Signature):
+    """Оценка значимости новости для финансовых рынков"""
+
+    headline = dspy.InputField(desc="Заголовок новости")
+    summary = dspy.InputField(desc="Краткое содержание новости (до 500 символов)")
+
+    significance_score = dspy.OutputField(desc="Балл значимости от 0 до 100")
+    is_significant = dspy.OutputField(desc="Значимая ли новость (true/false)")
+    reasoning = dspy.OutputField(desc="Объяснение почему важно или неважно")
+
 class NewsAnalyzer:
     def __init__(self, openrouter_api_key, model_name, temperature):
-        self.api_key = openrouter_api_key
-        self.model = model_name
-        self.temperature = temperature
-        self.api_url = "https://openrouter.ai/api/v1/chat/completions"
+        # Исправляем конфигурацию DSPy для OpenRouter
+        try:
+            # Используем новый рекомендуемый способ настройки DSPy 2.5.11
+            self.lm = dspy.LM(
+                model=f"openrouter/{model_name}",
+                api_key=openrouter_api_key,
+                api_base="https://openrouter.ai/api/v1",
+                temperature=temperature,
+                max_tokens=1000,
+                cache=False,
+                # Дополнительные заголовки для OpenRouter
+                extra_headers={
+                    "X-Title": "WaveSens News Analyzer",
+                    "HTTP-Referer": "https://wavesens-trading.app"
+                }
+            )
 
-        logger.info(f"NewsAnalyzer initialized with model: {model_name}")
+            # Устанавливаем модель для DSPy
+            dspy.configure(lm=self.lm)
+
+            logger.info(f"DSPy configured with OpenRouter model: {model_name}")
+
+        except Exception as e:
+            logger.error(f"DSPy configuration failed: {e}")
+            # Fallback конфигурация без extra_headers
+            try:
+                self.lm = dspy.LM(
+                    model=f"openrouter/{model_name}",
+                    api_key=openrouter_api_key,
+                    api_base="https://openrouter.ai/api/v1",
+                    temperature=temperature,
+                    max_tokens=1000,
+                    cache=False
+                )
+                dspy.configure(lm=self.lm)
+                logger.info(f"DSPy configured with fallback method for model: {model_name}")
+            except Exception as e2:
+                logger.error(f"DSPy fallback configuration also failed: {e2}")
+                raise e2
+
+        self.predictor = dspy.Predict(NewsSignificanceSignature)
 
     def analyze(self, headline, summary):
-        """Анализ значимости новости через прямой API call"""
+        """Анализ значимости новости"""
         try:
             # Обрезаем summary до 500 символов
             truncated_summary = summary[:500] if summary else ""
 
-            prompt = f"""Оцени значимость этой новости для финансовых рынков и трейдеров.
+            # Создаем подробный промпт для лучшего анализа
+            analysis_context = f"""
+Анализируй эту новость для финансовых трейдеров.
 
-Заголовок: {headline}
-Содержание: {truncated_summary}
+Оценивай по критериям:
+- 80-100: критически важно (слияния, решения ФРС, кризисы)
+- 60-79: очень важно (отчеты крупных компаний, макроданные)
+- 40-59: умеренно важно (отраслевые новости)
+- 20-39: мало важно (кадровые изменения)
+- 0-19: не важно (советы, мнения)
 
-Ответь СТРОГО в формате JSON:
-{{
-  "significance_score": <число от 0 до 100>,
-  "is_significant": <true или false>,
-  "reasoning": "<краткое объяснение>"
-}}
+Значимыми считай новости со score >= 60.
+"""
 
-Критерии оценки:
-- 80-100: критически важно (слияния крупных компаний, решения ФРС, геополитические кризисы)
-- 60-79: очень важно (квартальные отчеты крупных компаний, макроэкономические данные)
-- 40-59: умеренно важно (отраслевые новости, новые продукты крупных компаний)
-- 20-39: мало важно (кадровые перестановки, мелкие события)
-- 0-19: не важно (развлекательный контент, советы, мнения)"""
-
-            headers = {
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://wavesens-trading.app",
-                "X-Title": "WaveSens News Analyzer"
-            }
-
-            data = {
-                "model": self.model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": self.temperature,
-                "max_tokens": 300
-            }
-
-            response = requests.post(
-                self.api_url,
-                headers=headers,
-                json=data,
-                timeout=30
+            response = self.predictor(
+                headline=headline,
+                summary=truncated_summary + "\n\n" + analysis_context
             )
 
-            if response.status_code != 200:
-                logger.error(f"OpenRouter API error: {response.status_code} - {response.text}")
-                return 0, False, f"API error: {response.status_code}"
-
-            result = response.json()
-
-            if 'choices' not in result or not result['choices']:
-                logger.error(f"Invalid API response: {result}")
-                return 0, False, "Invalid API response"
-
-            content = result['choices'][0]['message']['content'].strip()
-
-            # Парсим JSON из ответа
+            # Парсим ответ DSPy
             try:
-                # Ищем JSON в ответе
-                start = content.find('{')
-                end = content.rfind('}') + 1
-                if start >= 0 and end > start:
-                    json_str = content[start:end]
-                    parsed = json.loads(json_str)
+                score = int(response.significance_score)
+                score = max(0, min(100, score))  # Ограничиваем 0-100
+            except (ValueError, AttributeError):
+                logger.warning(f"Invalid score from DSPy: {response.significance_score}")
+                score = 0
 
-                    score = int(parsed.get('significance_score', 0))
-                    score = max(0, min(100, score))  # Ограничиваем 0-100
+            try:
+                is_significant_str = str(response.is_significant).lower()
+                is_significant = is_significant_str in ['true', '1', 'yes', 'да'] or score >= 60
+            except AttributeError:
+                is_significant = score >= 60
 
-                    is_significant = bool(parsed.get('is_significant', False))
-                    reasoning = str(parsed.get('reasoning', 'No reasoning provided'))
+            try:
+                reasoning = str(response.reasoning)
+            except AttributeError:
+                reasoning = "No reasoning provided"
 
-                    return score, is_significant, reasoning
-                else:
-                    logger.error(f"No JSON found in response: {content}")
-                    return 0, False, f"Parse error: no JSON"
+            logger.debug(f"DSPy analysis: score={score}, significant={is_significant}")
+            return score, is_significant, reasoning
 
-            except json.JSONDecodeError as e:
-                logger.error(f"JSON parse error: {e}, content: {content}")
-                return 0, False, f"JSON parse error: {str(e)}"
-
-        except requests.exceptions.Timeout:
-            logger.error("OpenRouter API timeout")
-            return 0, False, "API timeout"
-        except requests.exceptions.RequestException as e:
-            logger.error(f"OpenRouter API request failed: {e}")
-            return 0, False, f"Request failed: {str(e)}"
         except Exception as e:
-            logger.error(f"LLM analysis failed: {e}")
-            return 0, False, f"Analysis failed: {str(e)}"
+            logger.error(f"DSPy analysis failed: {e}")
+            return 0, False, f"DSPy error: {str(e)}"
