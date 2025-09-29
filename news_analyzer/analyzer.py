@@ -28,14 +28,23 @@ class NewsAnalyzer:
             import litellm
             litellm.drop_params = True
             litellm.turn_off_message_logging = True
-        except:
-            pass
+            # Отключаем проблемные параметры
+            if hasattr(litellm, 'client_kwargs'):
+                litellm.client_kwargs = {}
+        except Exception as e:
+            logger.debug(f"LiteLLM config warning: {e}")
+
+        # Используем прямое обращение к OpenRouter без проблемных параметров
+        import os
+        os.environ['OPENROUTER_API_KEY'] = openrouter_api_key
 
         self.lm = dspy.LM(
             model=f"openrouter/{model_name}",
             api_key=openrouter_api_key,
             api_base="https://openrouter.ai/api/v1",
-            temperature=temperature
+            temperature=temperature,
+            # Явно исключаем проблемные параметры
+            max_tokens=1000
         )
         dspy.settings.configure(lm=self.lm)
 
