@@ -1,12 +1,84 @@
 #!/usr/bin/env python3
 """
-LLM analyzer for news significance - DSPy with proper OpenRouter configuration
+LLM analyzer for news significance - Custom DSPy OpenRouter client
 """
 import dspy
 import logging
 import os
+import requests
+import json
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
+
+class CustomOpenRouterLM(dspy.LM):
+    """Custom OpenRouter LM that bypasses litellm completely"""
+
+    def __init__(self, model: str, api_key: str, temperature: float = 0.3, max_tokens: int = 1000):
+        self.model = model.replace("openrouter/", "")
+        self.api_key = api_key
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.api_url = "https://openrouter.ai/api/v1/chat/completions"
+
+        # DSPy compatibility attributes
+        self.model_name = model
+        self.provider = "openrouter"
+        self.kwargs = {}
+        self.cache = {}
+
+        logger.info(f"CustomOpenRouterLM initialized with model: {self.model}")
+
+    def __call__(self, prompt, **kwargs):
+        """Direct OpenRouter API call without litellm"""
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://wavesens-trading.app",
+                "X-Title": "WaveSens News Analyzer"
+            }
+
+            # Convert prompt to messages format
+            if isinstance(prompt, str):
+                messages = [{"role": "user", "content": prompt}]
+            else:
+                messages = prompt
+
+            data = {
+                "model": self.model,
+                "messages": messages,
+                "temperature": kwargs.get('temperature', self.temperature),
+                "max_tokens": kwargs.get('max_tokens', self.max_tokens)
+            }
+
+            response = requests.post(
+                self.api_url,
+                headers=headers,
+                json=data,
+                timeout=30
+            )
+
+            if response.status_code != 200:
+                error_msg = f"OpenRouter API error: {response.status_code} - {response.text}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
+
+            result = response.json()
+
+            if 'choices' not in result or not result['choices']:
+                error_msg = f"Invalid API response: {result}"
+                logger.error(error_msg)
+                raise Exception(error_msg)
+
+            content = result['choices'][0]['message']['content']
+
+            # Return in DSPy expected format
+            return [content]
+
+        except Exception as e:
+            logger.error(f"CustomOpenRouterLM call failed: {e}")
+            raise e
 
 class NewsSignificanceSignature(dspy.Signature):
     """Оценка значимости новости для финансовых рынков"""
@@ -20,49 +92,22 @@ class NewsSignificanceSignature(dspy.Signature):
 
 class NewsAnalyzer:
     def __init__(self, openrouter_api_key, model_name, temperature):
-        # Полная конфигурация litellm для исправления всех ошибок
+        # Используем кастомный OpenRouter client без litellm
         try:
-            import litellm
-            # Все возможные исправления для OpenRouter
-            litellm.drop_params = True
-            litellm.turn_off_message_logging = True
-
-            # Отключаем все проблемные параметры
-            if hasattr(litellm, 'client_kwargs'):
-                litellm.client_kwargs = {}
-
-            # Настройки для OpenRouter
-            litellm.set_verbose = False
-
-            # Принудительно отключаем proxies в любых вариантах
-            import os
-            for proxy_var in ['HTTP_PROXY', 'HTTPS_PROXY', 'http_proxy', 'https_proxy']:
-                if proxy_var in os.environ:
-                    del os.environ[proxy_var]
-
-            logger.info("litellm configured with all proxies fixes")
-
-        except Exception as e:
-            logger.warning(f"litellm configuration warning: {e}")
-
-        # Конфигурация DSPy для OpenRouter с минимальными параметрами
-        try:
-            # Используем только базовые параметры без проблемных настроек
-            self.lm = dspy.LM(
-                model=f"openrouter/{model_name}",
+            self.lm = CustomOpenRouterLM(
+                model=model_name,
                 api_key=openrouter_api_key,
-                api_base="https://openrouter.ai/api/v1",
                 temperature=temperature,
                 max_tokens=1000
             )
 
-            # Устанавливаем модель для DSPy
+            # Устанавливаем кастомную модель для DSPy
             dspy.configure(lm=self.lm)
 
-            logger.info(f"DSPy configured successfully with model: {model_name}")
+            logger.info(f"Custom OpenRouter LM configured successfully with model: {model_name}")
 
         except Exception as e:
-            logger.error(f"DSPy configuration failed: {e}")
+            logger.error(f"Custom OpenRouter LM configuration failed: {e}")
             raise e
 
         self.predictor = dspy.Predict(NewsSignificanceSignature)
