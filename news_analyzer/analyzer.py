@@ -20,21 +20,22 @@ class NewsSignificanceSignature(dspy.Signature):
 
 class NewsAnalyzer:
     def __init__(self, openrouter_api_key, model_name, temperature):
-        # Исправляем конфигурацию DSPy для OpenRouter
+        # Настраиваем litellm для корректной работы с OpenRouter
         try:
-            # Используем новый рекомендуемый способ настройки DSPy 2.5.11
+            import litellm
+            litellm.drop_params = True  # Отбрасываем неподдерживаемые параметры
+        except ImportError:
+            logger.warning("litellm not available for configuration")
+
+        # Конфигурация DSPy для OpenRouter без проблемных параметров
+        try:
             self.lm = dspy.LM(
                 model=f"openrouter/{model_name}",
                 api_key=openrouter_api_key,
                 api_base="https://openrouter.ai/api/v1",
                 temperature=temperature,
                 max_tokens=1000,
-                cache=False,
-                # Дополнительные заголовки для OpenRouter
-                extra_headers={
-                    "X-Title": "WaveSens News Analyzer",
-                    "HTTP-Referer": "https://wavesens-trading.app"
-                }
+                cache=False
             )
 
             # Устанавливаем модель для DSPy
@@ -44,21 +45,7 @@ class NewsAnalyzer:
 
         except Exception as e:
             logger.error(f"DSPy configuration failed: {e}")
-            # Fallback конфигурация без extra_headers
-            try:
-                self.lm = dspy.LM(
-                    model=f"openrouter/{model_name}",
-                    api_key=openrouter_api_key,
-                    api_base="https://openrouter.ai/api/v1",
-                    temperature=temperature,
-                    max_tokens=1000,
-                    cache=False
-                )
-                dspy.configure(lm=self.lm)
-                logger.info(f"DSPy configured with fallback method for model: {model_name}")
-            except Exception as e2:
-                logger.error(f"DSPy fallback configuration also failed: {e2}")
-                raise e2
+            raise e
 
         self.predictor = dspy.Predict(NewsSignificanceSignature)
 
