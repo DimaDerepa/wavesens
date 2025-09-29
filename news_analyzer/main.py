@@ -58,9 +58,9 @@ class NewsAnalyzerService:
         if now.weekday() >= 5:  # Суббота = 5, Воскресенье = 6
             return False
 
-        # Проверка времени (9:30 - 16:00 EST) с буфером
-        market_open = now.replace(hour=9, minute=0, second=0, microsecond=0)
-        market_close = now.replace(hour=16, minute=30, second=0, microsecond=0)
+        # Проверка времени (9:30 - 16:00 EST)
+        market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+        market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
 
         return market_open <= now <= market_close
 
