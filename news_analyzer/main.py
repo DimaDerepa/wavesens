@@ -143,6 +143,11 @@ class NewsAnalyzerService:
                 score, reasoning, is_significant
             )
 
+            # ВРЕМЕННЫЙ DEBUG для первых 3 новостей
+            if news_id in ['finnhub:7520222', 'finnhub:7520221', 'finnhub:7520218']:
+                logger.info(f"🔍 DEBUG {news_id}: save_success={success}, score={score}, significant={is_significant}")
+                logger.info(f"🔍 DEBUG {news_id}: headline='{headline[:100]}'")
+
             if success:
                 self.stats['news_processed'] += 1
                 if is_significant:
@@ -152,6 +157,7 @@ class NewsAnalyzerService:
                     logger.debug(f"Not significant [{score}]: {headline[:50]}...")
             else:
                 self.stats['errors'] += 1
+                logger.error(f"❌ Failed to save {news_id}: {headline[:50]}...")
 
         except Exception as e:
             logger.error(f"Processing failed for news item: {e}")
