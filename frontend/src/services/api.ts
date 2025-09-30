@@ -10,8 +10,7 @@ const getApiBaseUrl = () => {
 
   // For Railway: detect if we're on Railway and use Railway backend
   if (typeof window !== 'undefined' && window.location.hostname.includes('.railway.app')) {
-    // IMPORTANT: Set this to your actual Railway API server URL
-    return 'https://api-server-production.up.railway.app';
+    return 'https://backend-production-7a68.up.railway.app';
   }
 
   // Local development - API server runs on port 8000
