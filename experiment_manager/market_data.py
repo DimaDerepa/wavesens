@@ -15,9 +15,9 @@ class MarketDataProvider:
     def __init__(self, alpha_vantage_key=None):
         self.alpha_vantage_key = alpha_vantage_key
         self.price_cache = {}
-        self.cache_ttl = 120  # секунд (увеличено с 30 для снижения rate limits)
+        self.cache_ttl = 300  # 5 минут (увеличено для снижения rate limits)
         self.last_yahoo_request = 0
-        self.yahoo_rate_limit_delay = 1.0  # секунд между запросами
+        self.yahoo_rate_limit_delay = 3.0  # 3 секунды между запросами (увеличено из-за 429)
 
     def get_current_price(self, ticker: str) -> Optional[float]:
         """Получает текущую цену тикера"""
@@ -50,10 +50,12 @@ class MarketDataProvider:
     def _get_price_yahoo(self, ticker: str) -> Optional[float]:
         """Получает цену через Yahoo Finance с rate limiting"""
         try:
-            # Rate limiting
+            # Aggressive rate limiting to avoid 429s
             time_since_last_request = time.time() - self.last_yahoo_request
             if time_since_last_request < self.yahoo_rate_limit_delay:
-                time.sleep(self.yahoo_rate_limit_delay - time_since_last_request)
+                sleep_time = self.yahoo_rate_limit_delay - time_since_last_request
+                logger.debug(f"Rate limiting: sleeping {sleep_time:.1f}s before requesting {ticker}")
+                time.sleep(sleep_time)
 
             self.last_yahoo_request = time.time()
 

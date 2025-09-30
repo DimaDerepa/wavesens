@@ -429,8 +429,9 @@ class ExperimentManagerService:
         """Обрабатывает необработанные сигналы при запуске"""
         try:
             cursor = self.conn.cursor()
+            # Ограничиваем обработку только сигналами с открытыми окнами входа
             cursor.execute("""
-                SELECT id FROM trading_signals
+                SELECT id, created_at, elliott_wave FROM trading_signals
                 WHERE created_at > NOW() - INTERVAL '24 hours'
                 ORDER BY created_at DESC
                 LIMIT 50
@@ -438,10 +439,30 @@ class ExperimentManagerService:
 
             pending_signals = cursor.fetchall()
             if pending_signals:
-                logger.info(f"Found {len(pending_signals)} recent signals to process")
-                for (signal_id,) in pending_signals:
-                    self.process_signal(signal_id)
-                    time.sleep(0.5)  # Небольшая задержка между обработкой
+                logger.info(f"Found {len(pending_signals)} recent signals")
+
+                # Фильтруем сигналы с открытыми окнами входа
+                processable_count = 0
+                for (signal_id, created_at, wave) in pending_signals:
+                    # Быстрая проверка времени входа без загрузки полных данных
+                    wave_intervals = {
+                        0: (0, 5), 1: (5, 30), 2: (30, 120), 3: (120, 360),
+                        4: (360, 1440), 5: (1440, 4320), 6: (4320, 10080)
+                    }
+                    start_min, end_min = wave_intervals.get(wave, (0, 1440))
+                    entry_start = created_at + timedelta(minutes=start_min)
+                    entry_end = created_at + timedelta(minutes=end_min)
+                    now = datetime.now(timezone.utc)
+
+                    if entry_start <= now <= entry_end:
+                        logger.info(f"Processing signal {signal_id} (wave {wave}, entry window open)")
+                        self.process_signal(signal_id)
+                        processable_count += 1
+                        time.sleep(1.0)  # Задержка для rate limiting
+                    else:
+                        logger.debug(f"Signal {signal_id} entry window not open yet")
+
+                logger.info(f"Processed {processable_count}/{len(pending_signals)} signals with open entry windows")
 
         except Exception as e:
             logger.error(f"Failed to process pending signals: {e}")
