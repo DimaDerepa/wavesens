@@ -311,21 +311,10 @@ class SignalExtractorService:
                            f"({signal['confidence']}% < {self.config.MIN_CONFIDENCE}%)")
                 continue
 
-            # Валидируем тикер (не фильтруем при ошибках API)
-            try:
-                validation = self.ticker_validator.validate_ticker(signal['ticker'])
-                signal['ticker_validated'] = True
-                signal['ticker_exists'] = validation['exists']
-
-                # Только если тикер точно невалиден (не из-за 429)
-                if not validation['exists'] and validation['cached']:
-                    logger.warning(f"Invalid ticker filtered: {signal['ticker']}")
-                    continue
-            except Exception as e:
-                # При ошибке валидации (429 и др.) - пропускаем тикер
-                logger.warning(f"Ticker validation error for {signal['ticker']}, accepting anyway: {e}")
-                signal['ticker_validated'] = False
-                signal['ticker_exists'] = True
+            # Отключаем валидацию тикеров - LLM генерирует валидные тикеры
+            # Yahoo Finance rate limits (429) блокируют валидацию на Railway
+            signal['ticker_validated'] = False
+            signal['ticker_exists'] = True  # Доверяем LLM
 
             valid_signals.append(signal)
 
