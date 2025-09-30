@@ -156,8 +156,8 @@ class WaveAnalyzer:
         try:
             tickers = [t.strip().upper() for t in response.tickers.split(',')]
             actions = [a.strip().upper() for a in response.actions.split(',')]
-            moves = [float(m.strip()) for m in response.expected_moves.split(',')]
-            confidences = [int(c.strip()) for c in response.confidences.split(',')]
+            moves = [float(m.strip().replace('%', '')) for m in response.expected_moves.split(',')]
+            confidences = [int(c.strip().replace('%', '')) for c in response.confidences.split(',')]
 
             signals = []
             min_length = min(len(tickers), len(actions), len(moves), len(confidences))

@@ -374,11 +374,9 @@ class SignalExtractorService:
             cursor = self.conn.cursor()
             cursor.execute("""
                 UPDATE news_items
-                SET processed_by_block2 = TRUE,
-                    block2_processed_at = NOW(),
-                    block2_skip_reason = %s
+                SET processed_by_block2 = TRUE
                 WHERE id = %s
-            """, (skip_reason, news_id))
+            """, (news_id,))
 
         except Exception as e:
             logger.error(f"Failed to mark news {news_id} as processed: {e}")
