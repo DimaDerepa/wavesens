@@ -311,14 +311,21 @@ class SignalExtractorService:
                            f"({signal['confidence']}% < {self.config.MIN_CONFIDENCE}%)")
                 continue
 
-            # Валидируем тикер
-            validation = self.ticker_validator.validate_ticker(signal['ticker'])
-            signal['ticker_validated'] = True
-            signal['ticker_exists'] = validation['exists']
+            # Валидируем тикер (не фильтруем при ошибках API)
+            try:
+                validation = self.ticker_validator.validate_ticker(signal['ticker'])
+                signal['ticker_validated'] = True
+                signal['ticker_exists'] = validation['exists']
 
-            if not validation['exists']:
-                logger.warning(f"Invalid ticker filtered: {signal['ticker']}")
-                continue
+                # Только если тикер точно невалиден (не из-за 429)
+                if not validation['exists'] and validation['cached']:
+                    logger.warning(f"Invalid ticker filtered: {signal['ticker']}")
+                    continue
+            except Exception as e:
+                # При ошибке валидации (429 и др.) - пропускаем тикер
+                logger.warning(f"Ticker validation error for {signal['ticker']}, accepting anyway: {e}")
+                signal['ticker_validated'] = False
+                signal['ticker_exists'] = True
 
             valid_signals.append(signal)
 

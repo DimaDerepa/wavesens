@@ -79,13 +79,15 @@ class TickerValidator:
 
         except Exception as e:
             logger.warning(f"Ticker {ticker} validation failed: {e}")
-            self.invalid_tickers.add(ticker)
+            # НЕ кэшируем как invalid если это временная ошибка (429, network)
+            # self.invalid_tickers.add(ticker)
 
             return {
                 'ticker': ticker,
-                'exists': False,
+                'exists': False,  # Не подтверждён, но и не отклонён
                 'cached': False,
-                'info': None
+                'info': None,
+                'error': str(e)
             }
 
     def validate_multiple(self, tickers: list) -> Dict[str, Dict]:
