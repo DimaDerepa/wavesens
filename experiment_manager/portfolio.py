@@ -413,9 +413,8 @@ class PortfolioManager:
         """Рассчитывает нереализованную прибыль/убыток"""
         try:
             cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-            # Упрощенная версия без связи с signals
             cursor.execute("""
-                SELECT id, name, position_size
+                SELECT id, ticker, position_size, shares, entry_price
                 FROM experiments
                 WHERE status = 'active'
             """)
@@ -424,9 +423,20 @@ class PortfolioManager:
             total_unrealized = 0
 
             for position in active_positions:
-                # Временно возвращаем 0 так как нет tickers в experiments
-                # TODO: добавить ticker в experiments или другую логику
-                pass
+                ticker = position['ticker']
+                shares = float(position['shares'])
+                entry_price = float(position['entry_price'])
+                position_size = float(position['position_size'])
+
+                # Получаем текущую цену
+                current_price = self.market_data.get_current_price(ticker, allow_stale=True)
+
+                if current_price:
+                    current_value = shares * current_price
+                    unrealized = current_value - position_size
+                    total_unrealized += unrealized
+                else:
+                    logger.debug(f"Cannot calculate unrealized P&L for {ticker} - no price available")
 
             return total_unrealized
 
