@@ -15,7 +15,9 @@ class MarketDataProvider:
     def __init__(self, alpha_vantage_key=None):
         self.alpha_vantage_key = alpha_vantage_key
         self.price_cache = {}
-        self.cache_ttl = 30  # секунд
+        self.cache_ttl = 120  # секунд (увеличено с 30 для снижения rate limits)
+        self.last_yahoo_request = 0
+        self.yahoo_rate_limit_delay = 1.0  # секунд между запросами
 
     def get_current_price(self, ticker: str) -> Optional[float]:
         """Получает текущую цену тикера"""
@@ -46,10 +48,22 @@ class MarketDataProvider:
         return price
 
     def _get_price_yahoo(self, ticker: str) -> Optional[float]:
-        """Получает цену через Yahoo Finance"""
+        """Получает цену через Yahoo Finance с rate limiting"""
         try:
+            # Rate limiting
+            time_since_last_request = time.time() - self.last_yahoo_request
+            if time_since_last_request < self.yahoo_rate_limit_delay:
+                time.sleep(self.yahoo_rate_limit_delay - time_since_last_request)
+
+            self.last_yahoo_request = time.time()
+
+            # Используем простой history запрос без info (info вызывает 429)
             stock = yf.Ticker(ticker)
             hist = stock.history(period="1d", interval="1m")
+
+            if hist.empty:
+                # Пробуем с большим периодом
+                hist = stock.history(period="5d")
 
             if hist.empty:
                 logger.warning(f"No data from Yahoo Finance for {ticker}")
@@ -60,7 +74,11 @@ class MarketDataProvider:
             return float(latest_price)
 
         except Exception as e:
-            logger.warning(f"Yahoo Finance error for {ticker}: {e}")
+            # Проверяем на 429 error
+            if '429' in str(e) or 'Too Many Requests' in str(e):
+                logger.warning(f"Yahoo Finance rate limit hit for {ticker}, will use Alpha Vantage")
+            else:
+                logger.warning(f"Yahoo Finance error for {ticker}: {e}")
             return None
 
     def _get_price_alpha_vantage(self, ticker: str) -> Optional[float]:
@@ -93,11 +111,16 @@ class MarketDataProvider:
     def get_bid_ask_spread(self, ticker: str) -> Tuple[float, float]:
         """Получает bid/ask спред для расчета более точного slippage"""
         try:
-            stock = yf.Ticker(ticker)
-            info = stock.info
+            # НЕ используем stock.info - вызывает 429
+            # Вместо этого используем упрощенный расчет на основе текущей цены
+            current_price = self.get_current_price(ticker)
+            if not current_price:
+                return (0.0, 0.0)
 
-            bid = info.get('bid')
-            ask = info.get('ask')
+            # Оцениваем спред как 0.1% от цены (типичный spread для ликвидных акций)
+            spread = current_price * 0.001
+            bid = current_price - spread / 2
+            ask = current_price + spread / 2
 
             if bid and ask:
                 return float(bid), float(ask)

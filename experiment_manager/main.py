@@ -175,27 +175,43 @@ class ExperimentManagerService:
         try:
             cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
             cursor.execute("""
-                SELECT s.*, n.headline
-                FROM signals s
-                JOIN news n ON s.news_id = n.id
-                WHERE s.id = %s
+                SELECT ts.id, ts.signal_type, ts.confidence, ts.elliott_wave,
+                       ts.market_conditions, ts.created_at, ni.headline, ni.id as news_item_id
+                FROM trading_signals ts
+                JOIN news_items ni ON ts.news_item_id = ni.id
+                WHERE ts.id = %s
             """, (signal_id,))
 
             row = cursor.fetchone()
             if not row:
                 return None
 
+            market_conditions = row['market_conditions'] or {}
+
+            # Вычисляем временные окна входа на основе волны и времени создания
+            created_at = row['created_at']
+            wave = row['elliott_wave']
+            wave_intervals = {
+                0: (0, 5), 1: (5, 30), 2: (30, 120), 3: (120, 360),
+                4: (360, 1440), 5: (1440, 4320), 6: (4320, 10080)
+            }
+            start_min, end_min = wave_intervals.get(wave, (0, 1440))
+
+            from datetime import timedelta
+            entry_start = created_at + timedelta(minutes=start_min)
+            entry_end = created_at + timedelta(minutes=end_min)
+
             return {
                 'id': row['id'],
-                'news_id': row['news_id'],
-                'ticker': row['ticker'],
-                'action': row['action'],
-                'wave': row['wave'],
-                'entry_start': row['entry_start'],
-                'entry_optimal': row['entry_optimal'],
-                'entry_end': row['entry_end'],
-                'expected_move': row['expected_move_percent'],
-                'confidence': row['confidence'],
+                'news_id': row['news_item_id'],
+                'ticker': market_conditions.get('ticker', ''),
+                'action': row['signal_type'],
+                'wave': wave,
+                'entry_start': entry_start,
+                'entry_optimal': created_at + timedelta(minutes=(start_min + end_min) / 2),
+                'entry_end': entry_end,
+                'expected_move': market_conditions.get('expected_move', 0),
+                'confidence': int(row['confidence'] * 100),  # Convert 0.8 to 80
                 'headline': row['headline']
             }
 
@@ -404,6 +420,27 @@ class ExperimentManagerService:
         cache_stats = self.market_data.get_cache_stats()
         logger.info(f"  Price cache: {cache_stats['valid_entries']}/{cache_stats['total_entries']} valid")
 
+    def process_pending_signals(self):
+        """Обрабатывает необработанные сигналы при запуске"""
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT id FROM trading_signals
+                WHERE created_at > NOW() - INTERVAL '24 hours'
+                ORDER BY created_at DESC
+                LIMIT 50
+            """)
+
+            pending_signals = cursor.fetchall()
+            if pending_signals:
+                logger.info(f"Found {len(pending_signals)} recent signals to process")
+                for (signal_id,) in pending_signals:
+                    self.process_signal(signal_id)
+                    time.sleep(0.5)  # Небольшая задержка между обработкой
+
+        except Exception as e:
+            logger.error(f"Failed to process pending signals: {e}")
+
     def run(self):
         """Основной цикл"""
         logger.info("Starting Experiment Manager")
@@ -423,6 +460,9 @@ class ExperimentManagerService:
         # Запускаем поток создания снимков портфеля
         snapshot_thread = threading.Thread(target=self.create_portfolio_snapshots, daemon=True)
         snapshot_thread.start()
+
+        # Обрабатываем существующие сигналы
+        self.process_pending_signals()
 
         last_hourly_log = datetime.now()
 
