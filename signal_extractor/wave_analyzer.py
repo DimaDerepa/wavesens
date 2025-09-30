@@ -45,14 +45,14 @@ class SignalGenerationSignature(dspy.Signature):
 
 class WaveAnalyzer:
     def __init__(self, openrouter_api_key, model_name, temperature, max_tokens, timeout):
-        # Настройка OpenRouter через DSPy
+        # Настройка OpenRouter через DSPy (правильный способ)
+        import os
+        os.environ['OPENROUTER_API_KEY'] = openrouter_api_key
+
         self.lm = dspy.LM(
             model=f"openrouter/{model_name}",
-            api_key=openrouter_api_key,
-            api_base="https://openrouter.ai/api/v1",
             temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=timeout
+            max_tokens=max_tokens
         )
         dspy.settings.configure(lm=self.lm)
 

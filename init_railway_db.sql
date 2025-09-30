@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS news_items (
     url VARCHAR(500),
     published_at TIMESTAMP WITH TIME ZONE NOT NULL,
     processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    significance_score DECIMAL(3,2),
+    significance_score DECIMAL(5,2),
     reasoning TEXT,
     is_significant BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -95,15 +95,7 @@ CREATE OR REPLACE FUNCTION notify_new_significant_news()
 RETURNS TRIGGER AS $$
 BEGIN
     IF NEW.is_significant = TRUE THEN
-        PERFORM pg_notify('significant_news',
-            json_build_object(
-                'id', NEW.id,
-                'news_id', NEW.news_id,
-                'headline', NEW.headline,
-                'score', NEW.significance_score,
-                'published_at', NEW.published_at
-            )::text
-        );
+        PERFORM pg_notify('new_significant_news', NEW.id::text);
     END IF;
     RETURN NEW;
 END;

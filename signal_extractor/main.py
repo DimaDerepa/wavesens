@@ -79,7 +79,7 @@ class SignalExtractorService:
                     url VARCHAR(500),
                     published_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                    significance_score DECIMAL(3,2),
+                    significance_score DECIMAL(5,2),
                     reasoning TEXT,
                     is_significant BOOLEAN DEFAULT FALSE,
                     processed_by_block2 BOOLEAN DEFAULT FALSE,
@@ -94,7 +94,7 @@ class SignalExtractorService:
                 'summary': 'TEXT',
                 'url': 'VARCHAR(500)',
                 'reasoning': 'TEXT',
-                'significance_score': 'DECIMAL(3,2)'
+                'significance_score': 'DECIMAL(5,2)'
             }
 
             for col_name, col_type in missing_columns.items():
