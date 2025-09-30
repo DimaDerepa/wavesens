@@ -24,3 +24,7 @@ buildCommand = "echo 'Building signal extractor'"
 [services.experiment_manager]
 source = "experiment_manager/"
 buildCommand = "echo 'Building experiment manager'"
+
+[services.api_server]
+source = "api_server/"
+buildCommand = "echo 'Building API server'"
