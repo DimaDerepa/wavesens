@@ -62,7 +62,7 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
 
       // Check if market is closed (no prices or all prices are 0)
       const hasPrices = Object.keys(tickerPrices).length > 0 &&
-                        Object.values(tickerPrices).some(p => p > 0);
+                        Object.values(tickerPrices).some((p: number) => p > 0);
       setMarketClosed(!hasPrices);
 
       setPrices(tickerPrices);
