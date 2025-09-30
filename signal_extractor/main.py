@@ -345,7 +345,7 @@ class SignalExtractorService:
                     wave,
                     f"Wave {wave} - {signal.get('wave_description', 'Elliott Wave analysis')}",
                     signal['reasoning'],
-                    {
+                    psycopg2.extras.Json({
                         'ticker': signal['ticker'],
                         'expected_move': signal.get('expected_move', 0),
                         'stop_loss_percent': self.config.DEFAULT_STOP_LOSS_PERCENT,
@@ -353,7 +353,7 @@ class SignalExtractorService:
                         'max_hold_hours': self.config.DEFAULT_MAX_HOLD_HOURS,
                         'ticker_validated': signal.get('ticker_validated', True),
                         'ticker_exists': signal.get('ticker_exists', True)
-                    }
+                    })
                 ))
                 saved_count += 1
 
