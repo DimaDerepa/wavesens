@@ -328,10 +328,10 @@ class PortfolioManager:
             # Получаем текущую цену если не передана
             if current_price is None:
                 execution_data = self.market_data.calculate_realistic_execution_price(
-                    'UNKNOWN', 'SELL', experiment['position_size']
+                    experiment['ticker'], 'SELL', experiment['position_size']
                 )
                 if not execution_data:
-                    logger.error(f"Could not get exit price for position {experiment['id']}")
+                    logger.error(f"Could not get exit price for position {experiment['id']} (ticker: {experiment['ticker']})")
                     return False
                 exit_price = execution_data['execution_price']
             else:
