@@ -1,24 +1,20 @@
 import axios from 'axios';
 import { NewsItem, Signal, Experiment, PortfolioSnapshot, SystemStatus, DashboardMetrics } from '../types';
 
-// Railway service reference solution
+// API Base URL configuration
 const getApiBaseUrl = () => {
-  // For Railway: use window.location.origin to detect if we're on Railway
-  if (typeof window !== 'undefined' && window.location.hostname.includes('.railway.app')) {
-    // We're on Railway, use the hardcoded backend URL
-    return 'https://backend-production-7a68.up.railway.app';
-  }
-
-  // Check environment variables for local development
-  if (process.env.REACT_APP_BACKEND_URL) {
-    return process.env.REACT_APP_BACKEND_URL;
-  }
-
+  // Check environment variables first
   if (process.env.REACT_APP_API_URL) {
     return process.env.REACT_APP_API_URL;
   }
 
-  // Local development fallback
+  // For Railway: detect if we're on Railway and use Railway backend
+  if (typeof window !== 'undefined' && window.location.hostname.includes('.railway.app')) {
+    // IMPORTANT: Set this to your actual Railway API server URL
+    return 'https://api-server-production.up.railway.app';
+  }
+
+  // Local development - API server runs on port 8000
   return 'http://localhost:8000';
 };
 
@@ -36,9 +32,27 @@ const api = axios.create({
   timeout: 10000,
 });
 
+// Export API_BASE_URL for components that need direct access
+export { API_BASE_URL };
+
 export const apiService = {
   async getDashboardMetrics(): Promise<DashboardMetrics> {
     const response = await api.get('/api/dashboard/metrics');
+    return response.data;
+  },
+
+  async getActivePositions(): Promise<any[]> {
+    const response = await api.get('/api/positions/active');
+    return response.data;
+  },
+
+  async getSignalsWithReasoning(limit = 50): Promise<any[]> {
+    const response = await api.get(`/api/signals/with-reasoning?limit=${limit}`);
+    return response.data;
+  },
+
+  async getServiceLogs(limit = 100): Promise<any> {
+    const response = await api.get(`/api/logs/by-service?limit=${limit}`);
     return response.data;
   },
 
