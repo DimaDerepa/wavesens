@@ -44,19 +44,33 @@ class PortfolioManager:
                 )
             """)
 
-            # Experiments таблица
+            # Experiments таблица - для трейдинговых позиций
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS experiments (
                     id SERIAL PRIMARY KEY,
-                    name VARCHAR(255) NOT NULL,
-                    description TEXT,
-                    start_date DATE NOT NULL DEFAULT CURRENT_DATE,
-                    end_date DATE NOT NULL DEFAULT (CURRENT_DATE + INTERVAL '30 days'),
-                    initial_balance DECIMAL(12,2) NOT NULL DEFAULT 10000,
-                    current_balance DECIMAL(12,2) NOT NULL DEFAULT 10000,
+                    signal_id INTEGER,
+                    news_id INTEGER,
+                    ticker VARCHAR(10) NOT NULL,
+                    entry_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    entry_price DECIMAL(10,4) NOT NULL,
+                    position_size DECIMAL(12,2) NOT NULL,
+                    shares DECIMAL(12,6) NOT NULL,
+                    commission_paid DECIMAL(8,4) DEFAULT 0,
+                    stop_loss_price DECIMAL(10,4),
+                    take_profit_price DECIMAL(10,4),
+                    max_hold_until TIMESTAMP WITH TIME ZONE,
+                    sp500_entry DECIMAL(10,4),
+                    exit_time TIMESTAMP WITH TIME ZONE,
+                    exit_price DECIMAL(10,4),
+                    exit_reason VARCHAR(50),
+                    gross_pnl DECIMAL(12,2),
+                    net_pnl DECIMAL(12,2),
+                    return_percent DECIMAL(8,4),
+                    hold_duration INTEGER,
+                    sp500_exit DECIMAL(10,4),
+                    sp500_return DECIMAL(8,4),
+                    alpha DECIMAL(8,4),
                     status VARCHAR(20) DEFAULT 'active',
-                    position_size DECIMAL(12,2) DEFAULT 0,
-                    settings JSONB,
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                 )
@@ -260,15 +274,15 @@ class PortfolioManager:
             cursor = self.conn.cursor()
             cursor.execute("""
                 INSERT INTO experiments (
-                    signal_id, news_id, entry_time, entry_price, position_size, shares, commission_paid,
+                    signal_id, news_id, ticker, entry_time, entry_price, position_size, shares, commission_paid,
                     stop_loss_price, take_profit_price, max_hold_until, sp500_entry, status
                 ) VALUES (
-                    %s, %s, NOW(), %s, %s, %s, %s,
+                    %s, %s, %s, NOW(), %s, %s, %s, %s,
                     %s, %s, %s, %s, 'active'
                 ) RETURNING id
             """, (
-                signal_data['signal_id'], signal_data['news_id'],
-                execution_data['execution_price'], execution_data['position_size'],
+                signal_data['signal_id'], signal_data['news_id'], signal_data['ticker'],
+                execution_price, position_size,
                 shares, commission, stop_loss_price, take_profit_price,
                 max_hold_until, sp500_price
             ))

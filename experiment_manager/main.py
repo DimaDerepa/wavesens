@@ -13,6 +13,11 @@ import threading
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List
 
+# Отключаем debug спам от yfinance СРАЗУ
+logging.getLogger('yfinance').setLevel(logging.ERROR)
+logging.getLogger('peewee').setLevel(logging.ERROR)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+
 # Setup database logging FIRST, before any other logging
 try:
     from shared_logging import setup_database_logging
