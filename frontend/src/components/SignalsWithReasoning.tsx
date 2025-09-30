@@ -27,6 +27,8 @@ export const SignalsWithReasoning: React.FC<Props> = ({ apiBaseUrl }) => {
   const [loading, setLoading] = useState(true);
   const [expandedSignal, setExpandedSignal] = useState<number | null>(null);
   const [filter, setFilter] = useState<'all' | 'BUY' | 'SELL'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   useEffect(() => {
     loadSignals();
@@ -64,6 +66,17 @@ export const SignalsWithReasoning: React.FC<Props> = ({ apiBaseUrl }) => {
   const filteredSignals = filter === 'all'
     ? signals
     : signals.filter(s => s.signal_type === filter);
+
+  const totalPages = Math.ceil(filteredSignals.length / itemsPerPage);
+  const paginatedSignals = filteredSignals.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filter]);
 
   return (
     <Card
@@ -124,8 +137,8 @@ export const SignalsWithReasoning: React.FC<Props> = ({ apiBaseUrl }) => {
       }
       loading={loading}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '600px', overflowY: 'auto' }}>
-        {filteredSignals.length > 0 ? filteredSignals.map((signal) => {
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {paginatedSignals.length > 0 ? paginatedSignals.map((signal) => {
           const isExpanded = expandedSignal === signal.id;
           const ticker = signal.market_conditions?.ticker || 'N/A';
 
@@ -293,6 +306,59 @@ export const SignalsWithReasoning: React.FC<Props> = ({ apiBaseUrl }) => {
         }) : (
           <div style={{ textAlign: 'center', padding: '4rem', color: '#64748b', fontSize: '1.125rem', fontWeight: '500' }}>
             No {filter !== 'all' ? filter : ''} signals
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.75rem',
+            marginTop: '1.5rem',
+            paddingTop: '1.5rem',
+            borderTop: '1px solid rgba(71, 85, 105, 0.3)'
+          }}>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              style={{
+                padding: '0.5rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                backgroundColor: currentPage === 1 ? 'rgba(71, 85, 105, 0.2)' : 'rgba(56, 189, 248, 0.2)',
+                color: currentPage === 1 ? '#64748b' : '#38bdf8',
+                transition: 'all 0.2s'
+              }}
+            >
+              ← Previous
+            </button>
+
+            <div style={{ color: '#cbd5e1', fontSize: '0.875rem', fontWeight: '600' }}>
+              Page {currentPage} of {totalPages}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '0.5rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                backgroundColor: currentPage === totalPages ? 'rgba(71, 85, 105, 0.2)' : 'rgba(56, 189, 248, 0.2)',
+                color: currentPage === totalPages ? '#64748b' : '#38bdf8',
+                transition: 'all 0.2s'
+              }}
+            >
+              Next →
+            </button>
           </div>
         )}
       </div>

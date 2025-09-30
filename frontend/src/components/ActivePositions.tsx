@@ -24,6 +24,9 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
   const [sp500Price, setSp500Price] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [expandedPosition, setExpandedPosition] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [marketClosed, setMarketClosed] = useState(false);
+  const itemsPerPage = 5;
 
   useEffect(() => {
     loadPositions();
@@ -56,10 +59,17 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
       const data = await response.json();
 
       const { SPY, ...tickerPrices } = data;
+
+      // Check if market is closed (no prices or all prices are 0)
+      const hasPrices = Object.keys(tickerPrices).length > 0 &&
+                        Object.values(tickerPrices).some(p => p > 0);
+      setMarketClosed(!hasPrices);
+
       setPrices(tickerPrices);
       if (SPY) setSp500Price(SPY);
     } catch (err) {
       console.error('Failed to load current prices:', err);
+      setMarketClosed(true);
     }
   };
 
@@ -79,6 +89,11 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
 
   const formatPercent = (value: number) =>
     `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
+
+  const getPnLColor = (value: number) => {
+    if (Math.abs(value) < 0.01) return '#94a3b8'; // Neutral gray for ~0%
+    return value >= 0 ? '#10b981' : '#ef4444';
+  };
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -103,10 +118,36 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
     return `${hours}h ${minutes}m`;
   };
 
+  const totalPages = Math.ceil(positions.length / itemsPerPage);
+  const paginatedPositions = positions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   return (
-    <Card title={`Active Positions (${positions.length})`} loading={loading}>
+    <Card
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <span>Active Positions ({positions.length})</span>
+          {marketClosed && (
+            <div style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: 'rgba(239, 68, 68, 0.2)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              borderRadius: '0.5rem',
+              color: '#fca5a5',
+              fontSize: '0.875rem',
+              fontWeight: '600'
+            }}>
+              🕒 Market Closed - Showing Last Prices
+            </div>
+          )}
+        </div>
+      }
+      loading={loading}
+    >
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-        {positions.length > 0 ? positions.map((position) => {
+        {paginatedPositions.length > 0 ? paginatedPositions.map((position) => {
           const currentPrice = prices[position.ticker] || position.entry_price;
           const pnl = calculateUnrealizedPnL(position, currentPrice);
           const pnlPercent = calculatePnLPercent(position, currentPrice);
@@ -189,7 +230,7 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
                     </div>
                     <div style={{
                       fontSize: '0.8125rem',
-                      color: pnl >= 0 ? '#10b981' : '#ef4444',
+                      color: getPnLColor((currentPrice / position.entry_price - 1) * 100),
                       fontWeight: '600'
                     }}>
                       {formatPercent((currentPrice / position.entry_price - 1) * 100)}
@@ -233,12 +274,12 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
                       letterSpacing: '0.05em',
                       marginBottom: '0.375rem'
                     }}>
-                      Size
+                      Invested
                     </div>
                     <div style={{
-                      fontSize: '1.125rem',
-                      fontWeight: '600',
-                      color: '#cbd5e1'
+                      fontSize: '1.5rem',
+                      fontWeight: '800',
+                      color: '#38bdf8'
                     }}>
                       {formatCurrency(position.position_size)}
                     </div>
@@ -246,7 +287,7 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
                       fontSize: '0.8125rem',
                       color: '#64748b'
                     }}>
-                      Cost Basis
+                      Position Size
                     </div>
                   </div>
 
@@ -265,13 +306,13 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
                     <div style={{
                       fontSize: '1.5rem',
                       fontWeight: '800',
-                      color: pnl >= 0 ? '#10b981' : '#ef4444'
+                      color: getPnLColor(pnlPercent)
                     }}>
                       {formatCurrency(pnl)}
                     </div>
                     <div style={{
                       fontSize: '1rem',
-                      color: pnl >= 0 ? '#10b981' : '#ef4444',
+                      color: getPnLColor(pnlPercent),
                       fontWeight: '700'
                     }}>
                       {formatPercent(pnlPercent)}
@@ -395,7 +436,7 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
                           <div style={{
                             fontSize: '1.25rem',
                             fontWeight: '700',
-                            color: sp500Return >= 0 ? '#10b981' : '#ef4444'
+                            color: getPnLColor(sp500Return)
                           }}>
                             {formatPercent(sp500Return)}
                           </div>
@@ -407,7 +448,7 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
                           <div style={{
                             fontSize: '1.5rem',
                             fontWeight: '800',
-                            color: alpha >= 0 ? '#10b981' : '#ef4444'
+                            color: getPnLColor(alpha)
                           }}>
                             {formatPercent(alpha)}
                           </div>
@@ -428,6 +469,59 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
             fontWeight: '500'
           }}>
             No active positions
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.75rem',
+            marginTop: '1.5rem',
+            paddingTop: '1.5rem',
+            borderTop: '1px solid rgba(71, 85, 105, 0.3)'
+          }}>
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              style={{
+                padding: '0.5rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                backgroundColor: currentPage === 1 ? 'rgba(71, 85, 105, 0.2)' : 'rgba(56, 189, 248, 0.2)',
+                color: currentPage === 1 ? '#64748b' : '#38bdf8',
+                transition: 'all 0.2s'
+              }}
+            >
+              ← Previous
+            </button>
+
+            <div style={{ color: '#cbd5e1', fontSize: '0.875rem', fontWeight: '600' }}>
+              Page {currentPage} of {totalPages} • Showing {paginatedPositions.length} of {positions.length}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '0.5rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: '600',
+                border: 'none',
+                borderRadius: '0.5rem',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                backgroundColor: currentPage === totalPages ? 'rgba(71, 85, 105, 0.2)' : 'rgba(56, 189, 248, 0.2)',
+                color: currentPage === totalPages ? '#64748b' : '#38bdf8',
+                transition: 'all 0.2s'
+              }}
+            >
+              Next →
+            </button>
           </div>
         )}
       </div>
