@@ -25,7 +25,7 @@ export const ServiceLogs: React.FC<Props> = ({ apiBaseUrl }) => {
 
   useEffect(() => {
     loadLogs();
-    const interval = setInterval(loadLogs, 5000); // Update every 5s
+    const interval = setInterval(loadLogs, 30000); // Update every 30s
     return () => clearInterval(interval);
   }, [apiBaseUrl]);
 
@@ -174,7 +174,7 @@ export const ServiceLogs: React.FC<Props> = ({ apiBaseUrl }) => {
           fontSize: '0.75rem',
           color: '#9ca3af'
         }}>
-          Showing {currentLogs.length} most recent entries • Updates every 5s
+          Showing {currentLogs.length} most recent entries • Updates every 30s
         </div>
       )}
     </Card>

@@ -21,12 +21,13 @@ interface Props {
 export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
   const [positions, setPositions] = useState<Position[]>([]);
   const [prices, setPrices] = useState<Record<string, number>>({});
+  const [sp500Price, setSp500Price] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [expandedPosition, setExpandedPosition] = useState<number | null>(null);
 
   useEffect(() => {
     loadPositions();
-    const interval = setInterval(loadPositions, 10000); // Update every 10s
+    const interval = setInterval(loadPositions, 30000); // Update every 30s (was 10s)
     return () => clearInterval(interval);
   }, [apiBaseUrl]);
 
@@ -36,9 +37,29 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
       const data = await response.json();
       setPositions(data);
       setLoading(false);
+
+      // Load current prices for all tickers
+      if (data.length > 0) {
+        const tickers = data.map((p: Position) => p.ticker).join(',');
+        loadCurrentPrices(tickers);
+      }
     } catch (err) {
       console.error('Failed to load positions:', err);
       setLoading(false);
+    }
+  };
+
+  const loadCurrentPrices = async (tickers: string) => {
+    try {
+      const allTickers = `${tickers},SPY`; // Include SPY for S&P 500
+      const response = await fetch(`${apiBaseUrl}/api/market/current-prices?tickers=${allTickers}`);
+      const data = await response.json();
+
+      const { SPY, ...tickerPrices } = data;
+      setPrices(tickerPrices);
+      if (SPY) setSp500Price(SPY);
+    } catch (err) {
+      console.error('Failed to load current prices:', err);
     }
   };
 
@@ -214,7 +235,7 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
                   </div>
 
                   {/* Benchmark comparison */}
-                  {position.sp500_entry > 0 && (
+                  {position.sp500_entry > 0 && sp500Price > 0 && (
                     <div style={{
                       marginTop: '1rem',
                       padding: '0.75rem',
@@ -232,10 +253,25 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
                         </div>
                         <div>
                           <span style={{ color: '#6b7280' }}>Now: </span>
-                          {formatCurrency(664.70)} {/* TODO: Get real-time SPY price */}
+                          {formatCurrency(sp500Price)}
                         </div>
-                        <div style={{ color: '#3b82f6', fontWeight: '500' }}>
-                          +0.15% (vs {formatPercent(pnlPercent)})
+                        <div>
+                          <span style={{ color: '#6b7280' }}>S&P: </span>
+                          <span style={{
+                            color: sp500Price >= position.sp500_entry ? '#059669' : '#dc2626',
+                            fontWeight: '500'
+                          }}>
+                            {formatPercent((sp500Price / position.sp500_entry - 1) * 100)}
+                          </span>
+                        </div>
+                        <div>
+                          <span style={{ color: '#6b7280' }}>Alpha: </span>
+                          <span style={{
+                            color: pnlPercent > (sp500Price / position.sp500_entry - 1) * 100 ? '#059669' : '#dc2626',
+                            fontWeight: '600'
+                          }}>
+                            {formatPercent(pnlPercent - (sp500Price / position.sp500_entry - 1) * 100)}
+                          </span>
                         </div>
                       </div>
                     </div>

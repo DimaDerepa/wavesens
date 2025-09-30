@@ -443,6 +443,31 @@ async def get_wave_analysis():
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/market/current-prices")
+async def get_current_prices(tickers: str):
+    """Get current prices for tickers (comma-separated)"""
+    import requests
+
+    ticker_list = [t.strip() for t in tickers.split(',')]
+    FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', 'd367tv1r01qumnp4iltgd367tv1r01qumnp4ilu0')
+
+    prices = {}
+    for ticker in ticker_list:
+        try:
+            response = requests.get(
+                f'https://finnhub.io/api/v1/quote?symbol={ticker}&token={FINNHUB_API_KEY}',
+                timeout=5
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('c'):  # current price
+                    prices[ticker] = data['c']
+        except Exception as e:
+            logger.error(f"Error getting price for {ticker}: {e}")
+            continue
+
+    return prices
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time updates"""
