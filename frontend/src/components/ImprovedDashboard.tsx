@@ -95,28 +95,29 @@ const ImprovedDashboard: React.FC = () => {
   }
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f3f4f6' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#0f172a', backgroundImage: 'radial-gradient(circle at 50% 0%, rgba(56, 189, 248, 0.1) 0%, transparent 50%)' }}>
       {/* Sticky Header */}
       <div style={{
         position: 'sticky',
         top: 0,
         zIndex: 1000,
-        backgroundColor: 'white',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-        borderBottom: '1px solid #e5e7eb'
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        backdropFilter: 'blur(12px)',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.5)',
+        borderBottom: '1px solid rgba(56, 189, 248, 0.2)'
       }}>
-        <div style={{ maxWidth: '90rem', margin: '0 auto', padding: '0 1rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '3.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <h1 style={{ fontSize: '1.125rem', fontWeight: '600', color: '#111827', margin: 0 }}>
-                🌊 WaveSens Trading
+        <div style={{ maxWidth: '95rem', margin: '0 auto', padding: '0 1.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '4rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+              <h1 style={{ fontSize: '1.5rem', fontWeight: '700', color: '#38bdf8', margin: 0, letterSpacing: '-0.025em' }}>
+                🌊 WaveSens
               </h1>
-              <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
-                Elliott Wave Analysis Platform
+              <div style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: '500' }}>
+                Elliott Wave Trading Platform
               </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+              <div style={{ fontSize: '0.875rem', color: '#94a3b8', fontWeight: '500' }}>
                 {new Date().toLocaleString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -203,20 +204,21 @@ const ImprovedDashboard: React.FC = () => {
         {/* Tabbed Content Area */}
         <div style={{ marginBottom: '1.5rem' }}>
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', borderBottom: '2px solid #e5e7eb' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', borderBottom: '2px solid rgba(51, 65, 85, 0.5)' }}>
             <button
               onClick={() => setActiveTab('positions')}
               style={{
-                padding: '0.75rem 1.5rem',
-                fontSize: '0.875rem',
+                padding: '1rem 2rem',
+                fontSize: '0.9375rem',
                 fontWeight: '600',
                 border: 'none',
-                borderBottom: activeTab === 'positions' ? '2px solid #3b82f6' : '2px solid transparent',
+                borderBottom: activeTab === 'positions' ? '3px solid #38bdf8' : '3px solid transparent',
                 marginBottom: '-2px',
                 cursor: 'pointer',
-                backgroundColor: 'transparent',
-                color: activeTab === 'positions' ? '#3b82f6' : '#6b7280',
-                transition: 'all 0.2s'
+                backgroundColor: activeTab === 'positions' ? 'rgba(56, 189, 248, 0.1)' : 'transparent',
+                color: activeTab === 'positions' ? '#38bdf8' : '#64748b',
+                transition: 'all 0.2s',
+                borderRadius: '8px 8px 0 0'
               }}
             >
               📊 Active Positions
@@ -224,16 +226,17 @@ const ImprovedDashboard: React.FC = () => {
             <button
               onClick={() => setActiveTab('signals')}
               style={{
-                padding: '0.75rem 1.5rem',
-                fontSize: '0.875rem',
+                padding: '1rem 2rem',
+                fontSize: '0.9375rem',
                 fontWeight: '600',
                 border: 'none',
-                borderBottom: activeTab === 'signals' ? '2px solid #3b82f6' : '2px solid transparent',
+                borderBottom: activeTab === 'signals' ? '3px solid #38bdf8' : '3px solid transparent',
                 marginBottom: '-2px',
                 cursor: 'pointer',
-                backgroundColor: 'transparent',
-                color: activeTab === 'signals' ? '#3b82f6' : '#6b7280',
-                transition: 'all 0.2s'
+                backgroundColor: activeTab === 'signals' ? 'rgba(56, 189, 248, 0.1)' : 'transparent',
+                color: activeTab === 'signals' ? '#38bdf8' : '#64748b',
+                transition: 'all 0.2s',
+                borderRadius: '8px 8px 0 0'
               }}
             >
               🌊 Trading Signals
@@ -241,16 +244,17 @@ const ImprovedDashboard: React.FC = () => {
             <button
               onClick={() => setActiveTab('logs')}
               style={{
-                padding: '0.75rem 1.5rem',
-                fontSize: '0.875rem',
+                padding: '1rem 2rem',
+                fontSize: '0.9375rem',
                 fontWeight: '600',
                 border: 'none',
-                borderBottom: activeTab === 'logs' ? '2px solid #3b82f6' : '2px solid transparent',
+                borderBottom: activeTab === 'logs' ? '3px solid #38bdf8' : '3px solid transparent',
                 marginBottom: '-2px',
                 cursor: 'pointer',
-                backgroundColor: 'transparent',
-                color: activeTab === 'logs' ? '#3b82f6' : '#6b7280',
-                transition: 'all 0.2s'
+                backgroundColor: activeTab === 'logs' ? 'rgba(56, 189, 248, 0.1)' : 'transparent',
+                color: activeTab === 'logs' ? '#38bdf8' : '#64748b',
+                transition: 'all 0.2s',
+                borderRadius: '8px 8px 0 0'
               }}
             >
               📝 Service Logs
@@ -274,11 +278,18 @@ const ImprovedDashboard: React.FC = () => {
         {/* Footer */}
         <div style={{
           textAlign: 'center',
-          padding: '1rem',
-          fontSize: '0.75rem',
-          color: '#9ca3af'
+          padding: '2rem',
+          fontSize: '0.8125rem',
+          color: '#475569',
+          borderTop: '1px solid rgba(51, 65, 85, 0.5)',
+          marginTop: '3rem'
         }}>
-          WaveSens Trading Platform • Elliott Wave Analysis • Real-time Data from PostgreSQL
+          <div style={{ fontWeight: '600', color: '#38bdf8', marginBottom: '0.5rem' }}>
+            WaveSens Trading Platform
+          </div>
+          <div>
+            Elliott Wave Analysis • Real-time Data from PostgreSQL • No Mocks, No Fallbacks
+          </div>
         </div>
       </div>
     </div>

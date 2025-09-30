@@ -27,7 +27,7 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
 
   useEffect(() => {
     loadPositions();
-    const interval = setInterval(loadPositions, 30000); // Update every 30s (was 10s)
+    const interval = setInterval(loadPositions, 30000); // Update every 30s
     return () => clearInterval(interval);
   }, [apiBaseUrl]);
 
@@ -105,173 +105,312 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
 
   return (
     <Card title={`Active Positions (${positions.length})`} loading={loading}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '600px', overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         {positions.length > 0 ? positions.map((position) => {
           const currentPrice = prices[position.ticker] || position.entry_price;
           const pnl = calculateUnrealizedPnL(position, currentPrice);
           const pnlPercent = calculatePnLPercent(position, currentPrice);
           const isExpanded = expandedPosition === position.id;
           const timeRemaining = getTimeRemaining(position.max_hold_until);
+          const sp500Return = position.sp500_entry > 0 && sp500Price > 0
+            ? (sp500Price / position.sp500_entry - 1) * 100
+            : 0;
+          const alpha = pnlPercent - sp500Return;
 
           return (
             <div
               key={position.id}
               style={{
-                border: '1px solid #e5e7eb',
-                borderRadius: '0.5rem',
+                background: pnl >= 0
+                  ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(5, 150, 105, 0.05) 100%)'
+                  : 'linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(220, 38, 38, 0.05) 100%)',
+                borderRadius: '1rem',
+                border: pnl >= 0 ? '2px solid rgba(16, 185, 129, 0.3)' : '2px solid rgba(239, 68, 68, 0.3)',
                 overflow: 'hidden',
-                backgroundColor: '#fff'
+                boxShadow: '0 8px 16px rgba(0, 0, 0, 0.3)',
+                transition: 'all 0.3s ease'
               }}
             >
-              {/* Compact header - always visible */}
+              {/* Main Card - Always visible */}
               <div
                 onClick={() => setExpandedPosition(isExpanded ? null : position.id)}
                 style={{
-                  padding: '0.75rem',
+                  padding: '1.5rem',
                   cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  backgroundColor: pnl >= 0 ? '#f0fdf4' : '#fef2f2'
+                  display: 'grid',
+                  gridTemplateColumns: '140px 1fr auto',
+                  gap: '2rem',
+                  alignItems: 'center'
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
-                  {/* Ticker */}
-                  <div style={{ fontWeight: '600', fontSize: '1rem', minWidth: '60px' }}>
+                {/* Left: Ticker & Status */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <div style={{
+                    fontWeight: '800',
+                    fontSize: '2rem',
+                    color: '#fff',
+                    letterSpacing: '-0.025em'
+                  }}>
                     {position.ticker}
                   </div>
-
-                  {/* Price */}
-                  <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                    ${currentPrice.toFixed(2)}
-                  </div>
-
-                  {/* P&L */}
                   <div style={{
                     fontSize: '0.875rem',
-                    fontWeight: '600',
-                    color: pnl >= 0 ? '#059669' : '#dc2626'
-                  }}>
-                    {formatCurrency(pnl)} ({formatPercent(pnlPercent)})
-                  </div>
-
-                  {/* Time remaining */}
-                  <div style={{
-                    fontSize: '0.75rem',
-                    color: timeRemaining.includes('Expired') ? '#dc2626' : '#6b7280',
-                    marginLeft: 'auto'
+                    color: timeRemaining.includes('Expired') ? '#f87171' : '#94a3b8',
+                    fontWeight: '600'
                   }}>
                     ⏱ {timeRemaining}
                   </div>
+                </div>
 
-                  {/* Expand icon */}
-                  <div style={{ color: '#9ca3af' }}>
-                    {isExpanded ? '▼' : '▶'}
+                {/* Middle: Key Metrics Grid */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(4, 1fr)',
+                  gap: '1.5rem'
+                }}>
+                  {/* Current Price */}
+                  <div>
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: '#64748b',
+                      fontWeight: '600',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: '0.375rem'
+                    }}>
+                      Current
+                    </div>
+                    <div style={{
+                      fontSize: '1.5rem',
+                      fontWeight: '700',
+                      color: '#fff'
+                    }}>
+                      ${currentPrice.toFixed(2)}
+                    </div>
+                    <div style={{
+                      fontSize: '0.8125rem',
+                      color: pnl >= 0 ? '#10b981' : '#ef4444',
+                      fontWeight: '600'
+                    }}>
+                      {formatPercent((currentPrice / position.entry_price - 1) * 100)}
+                    </div>
                   </div>
+
+                  {/* Entry Price */}
+                  <div>
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: '#64748b',
+                      fontWeight: '600',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: '0.375rem'
+                    }}>
+                      Entry
+                    </div>
+                    <div style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: '#cbd5e1'
+                    }}>
+                      ${position.entry_price.toFixed(2)}
+                    </div>
+                    <div style={{
+                      fontSize: '0.8125rem',
+                      color: '#64748b'
+                    }}>
+                      {position.shares.toFixed(4)} sh
+                    </div>
+                  </div>
+
+                  {/* Position Size */}
+                  <div>
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: '#64748b',
+                      fontWeight: '600',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: '0.375rem'
+                    }}>
+                      Size
+                    </div>
+                    <div style={{
+                      fontSize: '1.125rem',
+                      fontWeight: '600',
+                      color: '#cbd5e1'
+                    }}>
+                      {formatCurrency(position.position_size)}
+                    </div>
+                    <div style={{
+                      fontSize: '0.8125rem',
+                      color: '#64748b'
+                    }}>
+                      Cost Basis
+                    </div>
+                  </div>
+
+                  {/* Unrealized P&L */}
+                  <div>
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: '#64748b',
+                      fontWeight: '600',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                      marginBottom: '0.375rem'
+                    }}>
+                      Unrealized
+                    </div>
+                    <div style={{
+                      fontSize: '1.5rem',
+                      fontWeight: '800',
+                      color: pnl >= 0 ? '#10b981' : '#ef4444'
+                    }}>
+                      {formatCurrency(pnl)}
+                    </div>
+                    <div style={{
+                      fontSize: '1rem',
+                      color: pnl >= 0 ? '#10b981' : '#ef4444',
+                      fontWeight: '700'
+                    }}>
+                      {formatPercent(pnlPercent)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right: Expand Icon */}
+                <div style={{
+                  fontSize: '1.5rem',
+                  color: '#64748b',
+                  transition: 'transform 0.3s',
+                  transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'
+                }}>
+                  ▶
                 </div>
               </div>
 
-              {/* Expanded details */}
+              {/* Expanded Details */}
               {isExpanded && (
-                <div style={{ padding: '1rem', backgroundColor: '#f9fafb', borderTop: '1px solid #e5e7eb' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                    {/* Left column */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500' }}>Entry</div>
-                        <div style={{ fontSize: '0.875rem' }}>
-                          {formatCurrency(position.entry_price)} • {position.shares.toFixed(4)} shares
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: '#9ca3af' }}>
-                          {formatTime(position.entry_time)}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500' }}>Position Size</div>
-                        <div style={{ fontSize: '0.875rem' }}>{formatCurrency(position.position_size)}</div>
-                      </div>
-
-                      <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500' }}>Stop Loss</div>
-                        <div style={{ fontSize: '0.875rem', color: '#dc2626' }}>
-                          {formatCurrency(position.stop_loss_price)}
-                          <span style={{ fontSize: '0.75rem', marginLeft: '0.5rem' }}>
-                            (-3.0%)
-                          </span>
-                        </div>
-                      </div>
+                <div style={{
+                  padding: '1.5rem',
+                  paddingTop: '0',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '1.5rem'
+                }}>
+                  {/* Risk Management */}
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    borderRadius: '0.75rem',
+                    padding: '1.25rem',
+                    border: '1px solid rgba(71, 85, 105, 0.3)'
+                  }}>
+                    <div style={{
+                      fontSize: '0.875rem',
+                      color: '#94a3b8',
+                      fontWeight: '700',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.1em',
+                      marginBottom: '1rem'
+                    }}>
+                      🛡️ Risk Management
                     </div>
-
-                    {/* Right column */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.5rem' }}>
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500' }}>Current Price</div>
-                        <div style={{ fontSize: '0.875rem', fontWeight: '600' }}>
-                          {formatCurrency(currentPrice)}
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', fontWeight: '600' }}>
+                          STOP LOSS
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: pnl >= 0 ? '#059669' : '#dc2626' }}>
-                          {formatPercent((currentPrice / position.entry_price - 1) * 100)} from entry
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#ef4444' }}>
+                          {formatCurrency(position.stop_loss_price)}
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#ef4444', marginTop: '0.25rem' }}>
+                          -3.0% Risk
                         </div>
                       </div>
-
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500' }}>Take Profit</div>
-                        <div style={{ fontSize: '0.875rem', color: '#059669' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', fontWeight: '600' }}>
+                          TAKE PROFIT
+                        </div>
+                        <div style={{ fontSize: '1.25rem', fontWeight: '700', color: '#10b981' }}>
                           {formatCurrency(position.take_profit_price)}
-                          <span style={{ fontSize: '0.75rem', marginLeft: '0.5rem' }}>
-                            (+5.0%)
-                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#10b981', marginTop: '0.25rem' }}>
+                          +5.0% Target
                         </div>
                       </div>
-
                       <div>
-                        <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500' }}>Max Hold Until</div>
-                        <div style={{ fontSize: '0.875rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', fontWeight: '600' }}>
+                          MAX HOLD
+                        </div>
+                        <div style={{ fontSize: '1rem', fontWeight: '600', color: '#cbd5e1' }}>
                           {formatTime(position.max_hold_until)}
+                        </div>
+                        <div style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>
+                          Entered: {formatTime(position.entry_time)}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Benchmark comparison */}
+                  {/* Benchmark Comparison */}
                   {position.sp500_entry > 0 && sp500Price > 0 && (
                     <div style={{
-                      marginTop: '1rem',
-                      padding: '0.75rem',
-                      backgroundColor: '#ffffff',
-                      borderRadius: '0.375rem',
-                      border: '1px solid #e5e7eb'
+                      background: 'rgba(56, 189, 248, 0.1)',
+                      borderRadius: '0.75rem',
+                      padding: '1.25rem',
+                      border: '1px solid rgba(56, 189, 248, 0.3)'
                     }}>
-                      <div style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '500', marginBottom: '0.5rem' }}>
-                        📊 Benchmark (S&P 500)
+                      <div style={{
+                        fontSize: '0.875rem',
+                        color: '#38bdf8',
+                        fontWeight: '700',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.1em',
+                        marginBottom: '1rem'
+                      }}>
+                        📊 Benchmark vs S&P 500
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.875rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1.5rem' }}>
                         <div>
-                          <span style={{ color: '#6b7280' }}>Entry: </span>
-                          {formatCurrency(position.sp500_entry)}
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', fontWeight: '600' }}>
+                            S&P 500 ENTRY
+                          </div>
+                          <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#cbd5e1' }}>
+                            {formatCurrency(position.sp500_entry)}
+                          </div>
                         </div>
                         <div>
-                          <span style={{ color: '#6b7280' }}>Now: </span>
-                          {formatCurrency(sp500Price)}
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', fontWeight: '600' }}>
+                            S&P 500 NOW
+                          </div>
+                          <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#cbd5e1' }}>
+                            {formatCurrency(sp500Price)}
+                          </div>
                         </div>
                         <div>
-                          <span style={{ color: '#6b7280' }}>S&P: </span>
-                          <span style={{
-                            color: sp500Price >= position.sp500_entry ? '#059669' : '#dc2626',
-                            fontWeight: '500'
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', fontWeight: '600' }}>
+                            S&P 500 RETURN
+                          </div>
+                          <div style={{
+                            fontSize: '1.25rem',
+                            fontWeight: '700',
+                            color: sp500Return >= 0 ? '#10b981' : '#ef4444'
                           }}>
-                            {formatPercent((sp500Price / position.sp500_entry - 1) * 100)}
-                          </span>
+                            {formatPercent(sp500Return)}
+                          </div>
                         </div>
                         <div>
-                          <span style={{ color: '#6b7280' }}>Alpha: </span>
-                          <span style={{
-                            color: pnlPercent > (sp500Price / position.sp500_entry - 1) * 100 ? '#059669' : '#dc2626',
-                            fontWeight: '600'
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem', fontWeight: '600' }}>
+                            ALPHA
+                          </div>
+                          <div style={{
+                            fontSize: '1.5rem',
+                            fontWeight: '800',
+                            color: alpha >= 0 ? '#10b981' : '#ef4444'
                           }}>
-                            {formatPercent(pnlPercent - (sp500Price / position.sp500_entry - 1) * 100)}
-                          </span>
+                            {formatPercent(alpha)}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -281,7 +420,13 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
             </div>
           );
         }) : (
-          <div style={{ textAlign: 'center', padding: '2rem', color: '#9ca3af' }}>
+          <div style={{
+            textAlign: 'center',
+            padding: '4rem',
+            color: '#64748b',
+            fontSize: '1.125rem',
+            fontWeight: '500'
+          }}>
             No active positions
           </div>
         )}

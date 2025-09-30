@@ -42,19 +42,19 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-md border border-gray-200 p-6 ${className}`}>
+    <div className={`bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl shadow-2xl border border-gray-700 p-6 hover:border-gray-600 transition-all ${className}`}>
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            {icon && <span className="text-gray-500">{icon}</span>}
-            <h3 className="text-sm font-medium text-gray-700">{title}</h3>
+            {icon && <span className="text-2xl">{icon}</span>}
+            <h3 className="text-sm font-medium text-gray-400 uppercase tracking-wider">{title}</h3>
           </div>
-          <div className="text-2xl font-bold text-gray-900 mb-1">{value}</div>
-          {subtitle && <div className="text-sm text-gray-500">{subtitle}</div>}
+          <div className="text-3xl font-bold text-white mb-1">{value}</div>
+          {subtitle && <div className="text-sm text-gray-400">{subtitle}</div>}
         </div>
         {trend && trendValue && (
           <div className={`text-right ${getTrendColor()}`}>
-            <div className="text-sm font-medium">
+            <div className="text-xl font-bold">
               {getTrendIcon()} {trendValue}
             </div>
           </div>
