@@ -236,8 +236,11 @@ class PortfolioManager:
     def enter_position(self, signal_data: Dict, execution_data: Dict) -> Optional[int]:
         """Входит в позицию и создает эксперимент"""
         try:
-            # Получаем данные бенчмарка
+            # Получаем данные бенчмарка (опционально - не фейлим если недоступен)
             sp500_price = self.market_data.get_benchmark_price('SPY')
+            if sp500_price is None:
+                logger.warning("Could not get SPY benchmark price, proceeding without benchmark")
+                sp500_price = 0  # Ставим 0 чтобы не фейлить трейд
 
             # Рассчитываем параметры позиции (convert all to float to avoid Decimal errors)
             position_size = float(execution_data['position_size'])

@@ -31,8 +31,11 @@ class ExperimentManagerService:
         self.config = Config()
         self.config.validate()
 
-        # Инициализация компонентов
-        self.market_data = MarketDataProvider(self.config.ALPHA_VANTAGE_API_KEY)
+        # Инициализация компонентов с Finnhub fallback
+        self.market_data = MarketDataProvider(
+            alpha_vantage_key=self.config.ALPHA_VANTAGE_API_KEY,
+            finnhub_key=self.config.FINNHUB_API_KEY
+        )
         self.portfolio = PortfolioManager(self.config, self.market_data)
 
         # Подключение к БД для уведомлений
@@ -139,14 +142,31 @@ class ExperimentManagerService:
                 logger.warning(f"Cannot enter position: {reason}")
                 return
 
-            # Получаем реалистичную цену исполнения
+            # Получаем реалистичную цену исполнения (пробуем с allow_stale если не получилось)
             execution_data = self.market_data.calculate_realistic_execution_price(
                 signal_data['ticker'], signal_data['action'], position_size
             )
 
             if not execution_data:
-                logger.error(f"Could not get execution price for {signal_data['ticker']}")
-                return
+                logger.warning(f"Could not get fresh price for {signal_data['ticker']}, trying with stale cache...")
+                # Пробуем еще раз с разрешением stale cache
+                current_price = self.market_data.get_current_price(signal_data['ticker'], allow_stale=True)
+                if current_price:
+                    # Создаем упрощенные execution_data
+                    execution_data = {
+                        'market_price': current_price,
+                        'execution_price': current_price * 1.001,  # Добавляем небольшой slippage
+                        'spread': current_price * 0.001,
+                        'slippage': current_price * 0.0005,
+                        'market_impact': 0,
+                        'total_cost': current_price * 0.0015,
+                        'volume': None,
+                        'position_size': position_size
+                    }
+                    logger.info(f"Using stale price for {signal_data['ticker']}: ${current_price:.2f}")
+                else:
+                    logger.error(f"Could not get any price for {signal_data['ticker']} - skipping")
+                    return
 
             # Входим в позицию
             experiment_id = self.portfolio.enter_position({

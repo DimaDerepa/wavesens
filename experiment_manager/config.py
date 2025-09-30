@@ -45,6 +45,7 @@ class Config:
     # Market Data APIs
     YAHOO_FINANCE_API_KEY = os.getenv('YAHOO_FINANCE_API_KEY')  # Опционально
     ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY')  # Fallback
+    FINNHUB_API_KEY = os.getenv('API__FINNHUB_API_KEY')  # Fallback
 
     # Logging
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')

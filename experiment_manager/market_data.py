@@ -12,28 +12,55 @@ from typing import Dict, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 class MarketDataProvider:
-    def __init__(self, alpha_vantage_key=None):
+    def __init__(self, alpha_vantage_key=None, finnhub_key=None):
         self.alpha_vantage_key = alpha_vantage_key
+        self.finnhub_key = finnhub_key
         self.price_cache = {}
-        self.cache_ttl = 300  # 5 минут (увеличено для снижения rate limits)
+        self.cache_ttl = 300  # 5 минут
+        self.stale_cache_ttl = 3600  # 1 час - используем для fallback
         self.last_yahoo_request = 0
-        self.yahoo_rate_limit_delay = 3.0  # 3 секунды между запросами (увеличено из-за 429)
+        self.yahoo_rate_limit_delay = 3.0  # 3 секунды между запросами
+        self.yahoo_blocked = False  # Флаг блокировки Yahoo
+        self.yahoo_block_until = 0  # Время до которого не пытаться Yahoo
 
-    def get_current_price(self, ticker: str) -> Optional[float]:
-        """Получает текущую цену тикера"""
-        # Проверяем кеш
+    def get_current_price(self, ticker: str, allow_stale=False) -> Optional[float]:
+        """Получает текущую цену тикера с умным fallback"""
+        # Проверяем свежий кеш
         cached_data = self.price_cache.get(ticker)
-        if cached_data and (time.time() - cached_data['timestamp']) < self.cache_ttl:
-            logger.debug(f"Using cached price for {ticker}: ${cached_data['price']}")
-            return cached_data['price']
+        if cached_data:
+            cache_age = time.time() - cached_data['timestamp']
+            if cache_age < self.cache_ttl:
+                logger.debug(f"Using cached price for {ticker}: ${cached_data['price']:.2f}")
+                return cached_data['price']
+            elif allow_stale and cache_age < self.stale_cache_ttl:
+                logger.warning(f"Using STALE cached price for {ticker}: ${cached_data['price']:.2f} (age: {cache_age/60:.1f}m)")
+                return cached_data['price']
 
-        # Пытаемся получить через Yahoo Finance
-        price = self._get_price_yahoo(ticker)
+        # 1. Пробуем Yahoo Finance (если не заблокирован)
+        price = None
+        if not self.yahoo_blocked or time.time() > self.yahoo_block_until:
+            price = self._get_price_yahoo(ticker)
+            if price is None and '429' in str(getattr(self, '_last_yahoo_error', '')):
+                # Yahoo заблокировал - переключаемся на другие источники
+                self.yahoo_blocked = True
+                self.yahoo_block_until = time.time() + 600  # 10 минут
+                logger.warning(f"Yahoo Finance blocked (429), switching to alternatives for 10 minutes")
 
-        # Fallback на Alpha Vantage
+        # 2. Fallback на Finnhub
+        if price is None and self.finnhub_key:
+            logger.info(f"Trying Finnhub for {ticker}")
+            price = self._get_price_finnhub(ticker)
+
+        # 3. Fallback на Alpha Vantage
         if price is None and self.alpha_vantage_key:
-            logger.warning(f"Yahoo Finance failed for {ticker}, trying Alpha Vantage")
+            logger.info(f"Trying Alpha Vantage for {ticker}")
             price = self._get_price_alpha_vantage(ticker)
+
+        # 4. Используем устаревший кеш как последний fallback
+        if price is None and cached_data and allow_stale:
+            cache_age = time.time() - cached_data['timestamp']
+            logger.warning(f"All sources failed, using STALE cache for {ticker}: ${cached_data['price']:.2f} (age: {cache_age/60:.1f}m)")
+            return cached_data['price']
 
         # Кешируем результат
         if price is not None:
@@ -41,46 +68,78 @@ class MarketDataProvider:
                 'price': price,
                 'timestamp': time.time()
             }
-            logger.debug(f"Got price for {ticker}: ${price}")
+            logger.info(f"✅ Got price for {ticker}: ${price:.2f}")
         else:
-            logger.error(f"Failed to get price for {ticker}")
+            logger.error(f"❌ Failed to get price for {ticker} from all sources")
 
         return price
 
     def _get_price_yahoo(self, ticker: str) -> Optional[float]:
         """Получает цену через Yahoo Finance с rate limiting"""
         try:
-            # Aggressive rate limiting to avoid 429s
+            # Aggressive rate limiting
             time_since_last_request = time.time() - self.last_yahoo_request
             if time_since_last_request < self.yahoo_rate_limit_delay:
                 sleep_time = self.yahoo_rate_limit_delay - time_since_last_request
-                logger.debug(f"Rate limiting: sleeping {sleep_time:.1f}s before requesting {ticker}")
                 time.sleep(sleep_time)
 
             self.last_yahoo_request = time.time()
 
-            # Используем простой history запрос без info (info вызывает 429)
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period="1d", interval="1m")
+            # Отключаем debug логи yfinance временно
+            yf_logger = logging.getLogger('yfinance')
+            original_level = yf_logger.level
+            yf_logger.setLevel(logging.ERROR)
 
-            if hist.empty:
-                # Пробуем с большим периодом
-                hist = stock.history(period="5d")
+            try:
+                stock = yf.Ticker(ticker)
+                hist = stock.history(period="1d", interval="1m")
 
-            if hist.empty:
-                logger.warning(f"No data from Yahoo Finance for {ticker}")
-                return None
+                if hist.empty:
+                    hist = stock.history(period="5d")
 
-            # Берем последнюю доступную цену
-            latest_price = hist['Close'].iloc[-1]
-            return float(latest_price)
+                if hist.empty:
+                    self._last_yahoo_error = "No data"
+                    return None
+
+                latest_price = hist['Close'].iloc[-1]
+                return float(latest_price)
+            finally:
+                yf_logger.setLevel(original_level)
 
         except Exception as e:
-            # Проверяем на 429 error
+            self._last_yahoo_error = str(e)
             if '429' in str(e) or 'Too Many Requests' in str(e):
-                logger.warning(f"Yahoo Finance rate limit hit for {ticker}, will use Alpha Vantage")
+                logger.warning(f"Yahoo Finance 429 for {ticker}")
             else:
                 logger.warning(f"Yahoo Finance error for {ticker}: {e}")
+            return None
+
+    def _get_price_finnhub(self, ticker: str) -> Optional[float]:
+        """Получает цену через Finnhub API"""
+        if not self.finnhub_key:
+            return None
+
+        try:
+            url = f"https://finnhub.io/api/v1/quote"
+            params = {
+                'symbol': ticker,
+                'token': self.finnhub_key
+            }
+
+            response = requests.get(url, params=params, timeout=10)
+            data = response.json()
+
+            # Finnhub возвращает {'c': current_price, 'h': high, 'l': low, ...}
+            if 'c' in data and data['c'] > 0:
+                price = float(data['c'])
+                logger.info(f"Finnhub provided price for {ticker}: ${price:.2f}")
+                return price
+            else:
+                logger.warning(f"No valid price from Finnhub for {ticker}: {data}")
+                return None
+
+        except Exception as e:
+            logger.warning(f"Finnhub error for {ticker}: {e}")
             return None
 
     def _get_price_alpha_vantage(self, ticker: str) -> Optional[float]:
@@ -99,9 +158,10 @@ class MarketDataProvider:
             response = requests.get(url, params=params, timeout=10)
             data = response.json()
 
-            if 'Global Quote' in data:
-                price = data['Global Quote']['05. price']
-                return float(price)
+            if 'Global Quote' in data and '05. price' in data['Global Quote']:
+                price = float(data['Global Quote']['05. price'])
+                logger.info(f"Alpha Vantage provided price for {ticker}: ${price:.2f}")
+                return price
             else:
                 logger.warning(f"No price data from Alpha Vantage for {ticker}")
                 return None
@@ -154,8 +214,8 @@ class MarketDataProvider:
         return None
 
     def get_benchmark_price(self, benchmark_ticker: str = 'SPY') -> Optional[float]:
-        """Получает цену бенчмарка (по умолчанию S&P 500)"""
-        return self.get_current_price(benchmark_ticker)
+        """Получает цену бенчмарка (по умолчанию S&P 500) - разрешаем stale cache"""
+        return self.get_current_price(benchmark_ticker, allow_stale=True)
 
     def calculate_realistic_execution_price(self, ticker: str, side: str, position_size: float) -> Optional[Dict]:
         """
@@ -165,9 +225,12 @@ class MarketDataProvider:
         - Slippage
         - Market impact
         """
-        current_price = self.get_current_price(ticker)
+        current_price = self.get_current_price(ticker, allow_stale=False)
         if current_price is None:
             return None
+
+        # Добавляем position_size в результат
+        position_size_param = position_size
 
         bid, ask = self.get_bid_ask_spread(ticker)
         volume = self.get_volume(ticker)
@@ -205,7 +268,8 @@ class MarketDataProvider:
             'market_impact': market_impact,
             'total_cost': execution_price - current_price if side.upper() == 'BUY'
                          else current_price - execution_price,
-            'volume': volume
+            'volume': volume,
+            'position_size': position_size_param
         }
 
     def get_market_hours_status(self) -> str:
