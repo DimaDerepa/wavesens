@@ -333,27 +333,32 @@ class ExperimentManagerService:
                 logger.warning(f"Could not get current price for {position['ticker']}")
                 return
 
-            # Рассчитываем текущую P&L
-            current_value = position['shares'] * current_price
-            unrealized_pnl = current_value - position['position_size']
-            unrealized_percent = float(unrealized_pnl / position['position_size']) * 100
+            # Рассчитываем текущую P&L (convert Decimals to float)
+            shares = float(position['shares'])
+            position_size = float(position['position_size'])
+            stop_loss_price = float(position['stop_loss_price'])
+            take_profit_price = float(position['take_profit_price'])
+
+            current_value = shares * current_price
+            unrealized_pnl = current_value - position_size
+            unrealized_percent = (unrealized_pnl / position_size) * 100 if position_size > 0 else 0
 
             logger.debug(f"Position update: {position['ticker']}")
             logger.debug(f"  Current price: ${current_price:.2f}")
             logger.debug(f"  Unrealized P&L: ${unrealized_pnl:+.2f} ({unrealized_percent:+.2f}%)")
 
             # Проверяем stop loss
-            if current_price <= position['stop_loss_price']:
+            if current_price <= stop_loss_price:
                 logger.info(f"Stop loss hit for {position['ticker']}: "
-                           f"${current_price:.2f} <= ${position['stop_loss_price']:.2f}")
+                           f"${current_price:.2f} <= ${stop_loss_price:.2f}")
                 self.portfolio.exit_position(position['id'], 'stop_loss', current_price)
                 self.stats['positions_closed'] += 1
                 return
 
             # Проверяем take profit
-            if current_price >= position['take_profit_price']:
+            if current_price >= take_profit_price:
                 logger.info(f"Take profit hit for {position['ticker']}: "
-                           f"${current_price:.2f} >= ${position['take_profit_price']:.2f}")
+                           f"${current_price:.2f} >= ${take_profit_price:.2f}")
                 self.portfolio.exit_position(position['id'], 'take_profit', current_price)
                 self.stats['positions_closed'] += 1
                 return
@@ -361,7 +366,7 @@ class ExperimentManagerService:
             # Trailing stop logic (если активирован)
             if unrealized_percent >= self.config.TRAILING_STOP_ACTIVATION_PERCENT:
                 new_stop = current_price * (1 - self.config.TRAILING_STOP_DISTANCE_PERCENT / 100)
-                if new_stop > position['stop_loss_price']:
+                if new_stop > stop_loss_price:
                     # Обновляем trailing stop
                     cursor = self.conn.cursor()
                     cursor.execute("""

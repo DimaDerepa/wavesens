@@ -134,19 +134,24 @@ class PortfolioManager:
             # Рассчитываем текущую unrealized P&L для активных позиций
             unrealized_pnl = self.calculate_unrealized_pnl()
 
-            current_value = snapshot['cash_balance'] + unrealized_pnl + positions_info['total_exposure']
+            # Convert Decimal to float to avoid arithmetic errors
+            cash_balance = float(snapshot['cash_balance'])
+            total_exposure = float(positions_info['total_exposure'])
+            snapshot_total_value = float(snapshot['total_value'])
+
+            current_value = cash_balance + unrealized_pnl + total_exposure
 
             return {
                 'total_value': current_value,
-                'cash_balance': snapshot['cash_balance'],
+                'cash_balance': cash_balance,
                 'positions_count': positions_info['count'],
-                'positions_exposure': positions_info['total_exposure'],
+                'positions_exposure': total_exposure,
                 'unrealized_pnl': unrealized_pnl,
-                'realized_pnl_today': snapshot['realized_pnl_today'],
-                'realized_pnl_total': snapshot['realized_pnl_total'],
-                'daily_return': float(((float(current_value) / float(snapshot['total_value'])) - 1) * 100) if float(snapshot['total_value']) > 0 else 0,
-                'total_return': float(((float(current_value) / float(self.config.INITIAL_CAPITAL)) - 1) * 100),
-                'available_cash': snapshot['cash_balance'],
+                'realized_pnl_today': float(snapshot['realized_pnl_today']),
+                'realized_pnl_total': float(snapshot['realized_pnl_total']),
+                'daily_return': float(((current_value / snapshot_total_value) - 1) * 100) if snapshot_total_value > 0 else 0,
+                'total_return': float(((current_value / self.config.INITIAL_CAPITAL) - 1) * 100),
+                'available_cash': cash_balance,
                 'last_updated': snapshot['timestamp']
             }
 
@@ -216,7 +221,9 @@ class PortfolioManager:
                 return False, f"Would violate cash reserve: ${cash_after_position} < ${min_cash_reserve}"
 
             # Проверка 6: Daily loss limit
-            daily_loss_percent = float(abs(float(portfolio['realized_pnl_today'])) / float(portfolio['total_value'])) * 100
+            realized_pnl = portfolio['realized_pnl_today']
+            total_value = portfolio['total_value']
+            daily_loss_percent = (abs(realized_pnl) / total_value) * 100 if total_value > 0 else 0
             if daily_loss_percent >= self.config.DAILY_LOSS_LIMIT_PERCENT:
                 return False, f"Daily loss limit reached: {daily_loss_percent:.1f}% >= {self.config.DAILY_LOSS_LIMIT_PERCENT}%"
 
@@ -232,14 +239,16 @@ class PortfolioManager:
             # Получаем данные бенчмарка
             sp500_price = self.market_data.get_benchmark_price('SPY')
 
-            # Рассчитываем параметры позиции
-            shares = float(execution_data['position_size']) / float(execution_data['execution_price'])
-            commission = self.config.calculate_commission(execution_data['position_size'])
-            total_cost = execution_data['position_size'] + commission
+            # Рассчитываем параметры позиции (convert all to float to avoid Decimal errors)
+            position_size = float(execution_data['position_size'])
+            execution_price = float(execution_data['execution_price'])
+            shares = position_size / execution_price
+            commission = self.config.calculate_commission(position_size)
+            total_cost = position_size + commission
 
             # Рассчитываем уровни stop loss и take profit
-            stop_loss_price = execution_data['execution_price'] * (1 - self.config.DEFAULT_STOP_LOSS_PERCENT / 100)
-            take_profit_price = execution_data['execution_price'] * (1 + self.config.DEFAULT_TAKE_PROFIT_PERCENT / 100)
+            stop_loss_price = execution_price * (1 - self.config.DEFAULT_STOP_LOSS_PERCENT / 100)
+            take_profit_price = execution_price * (1 + self.config.DEFAULT_TAKE_PROFIT_PERCENT / 100)
 
             # Максимальное время удержания
             max_hold_until = datetime.now(timezone.utc) + timedelta(hours=signal_data.get('max_hold_hours', 6))
@@ -316,20 +325,25 @@ class PortfolioManager:
             # Получаем цену S&P 500 для бенчмарка
             sp500_exit = self.market_data.get_benchmark_price('SPY')
 
-            # Рассчитываем P&L
-            exit_commission = self.config.calculate_commission(experiment['position_size'])
-            proceeds = experiment['shares'] * exit_price - exit_commission
-            entry_cost = experiment['position_size'] + experiment['commission_paid']
+            # Рассчитываем P&L (convert all Decimals to float)
+            position_size = float(experiment['position_size'])
+            shares = float(experiment['shares'])
+            commission_paid = float(experiment['commission_paid'])
+
+            exit_commission = self.config.calculate_commission(position_size)
+            proceeds = shares * exit_price - exit_commission
+            entry_cost = position_size + commission_paid
 
             gross_pnl = proceeds - entry_cost
             net_pnl = gross_pnl  # Комиссия уже учтена
-            return_percent = (net_pnl / entry_cost) * 100
+            return_percent = (net_pnl / entry_cost) * 100 if entry_cost > 0 else 0
 
             # Бенчмарк расчеты
             sp500_return = 0
             alpha = 0
             if experiment['sp500_entry'] and sp500_exit:
-                sp500_return = float((sp500_exit / experiment['sp500_entry']) - 1) * 100
+                sp500_entry = float(experiment['sp500_entry'])
+                sp500_return = ((sp500_exit / sp500_entry) - 1) * 100
                 alpha = return_percent - sp500_return
 
             # Время удержания
@@ -487,7 +501,9 @@ class PortfolioManager:
         """Проверяет превышение дневного лимита потерь"""
         try:
             portfolio = self.get_portfolio_status()
-            daily_loss_percent = float(abs(float(portfolio['realized_pnl_today'])) / float(portfolio['total_value'])) * 100
+            realized_pnl = portfolio['realized_pnl_today']
+            total_value = portfolio['total_value']
+            daily_loss_percent = (abs(realized_pnl) / total_value) * 100 if total_value > 0 else 0
 
             return daily_loss_percent >= self.config.DAILY_LOSS_LIMIT_PERCENT
 
