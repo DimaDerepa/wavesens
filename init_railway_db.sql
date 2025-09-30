@@ -104,16 +104,7 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION notify_new_signal()
 RETURNS TRIGGER AS $$
 BEGIN
-    PERFORM pg_notify('new_trading_signal',
-        json_build_object(
-            'id', NEW.id,
-            'news_item_id', NEW.news_item_id,
-            'signal_type', NEW.signal_type,
-            'confidence', NEW.confidence,
-            'elliott_wave', NEW.elliott_wave,
-            'wave_description', NEW.wave_description
-        )::text
-    );
+    PERFORM pg_notify('new_trading_signals', NEW.id::text);
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
