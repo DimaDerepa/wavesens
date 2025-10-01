@@ -121,25 +121,24 @@ export const apiService = {
   },
 
   async getSystemLogs(): Promise<any> {
-    // For now, just return empty logs - no more mocks
-    // Frontend should show "No recent logs available"
-    // until real service logs are captured
-    try {
-      const response = await api.get('/api/system/real-logs');
-      return response.data;
-    } catch (error) {
-      console.error('Failed to get real logs:', error);
-      return {
-        "news_analyzer": [],
-        "signal_extractor": [],
-        "experiment_manager": []
-      };
-    }
+    // Return empty logs without making a request
+    // Use ServiceLogs component instead which calls /api/logs/by-service
+    return {
+      "news_analyzer": [],
+      "signal_extractor": [],
+      "experiment_manager": []
+    };
   },
 
   async getTokenUsage(): Promise<any> {
-    const response = await api.get('/api/system/tokens');
-    return response.data;
+    // Return empty token usage without making a request
+    // This endpoint doesn't exist yet
+    return {
+      total_tokens: 0,
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      cost: 0
+    };
   },
 
   async changeModel(modelId: string): Promise<any> {

@@ -51,6 +51,12 @@ class WebSocketService {
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
+        // Close existing connection before creating a new one
+        if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
+          console.log('Closing existing WebSocket connection before reconnecting');
+          this.ws.close(1000, 'Reconnecting');
+        }
+
         this.ws = new WebSocket(this.url);
 
         this.ws.onopen = () => {
