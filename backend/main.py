@@ -273,6 +273,65 @@ async def get_active_positions():
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/positions/history")
+async def get_portfolio_history(limit: int = 100):
+    """
+    Get closed trading positions with full P&L and alpha data
+    NO MOCKS - complete trading history
+    """
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+    try:
+        cur.execute("""
+            SELECT
+                e.id,
+                e.ticker,
+                e.signal_id,
+                e.entry_time,
+                e.exit_time,
+                e.entry_price,
+                e.exit_price,
+                e.position_size,
+                e.shares,
+                e.stop_loss_price,
+                e.take_profit_price,
+                e.commission_paid,
+                e.gross_pnl,
+                e.net_pnl,
+                e.return_percent,
+                e.hold_duration,
+                e.sp500_entry,
+                e.sp500_exit,
+                e.sp500_return,
+                e.alpha,
+                e.exit_reason,
+                ts.elliott_wave,
+                ts.signal_type,
+                ts.confidence,
+                ni.headline
+            FROM experiments e
+            LEFT JOIN trading_signals ts ON e.signal_id = ts.id
+            LEFT JOIN news_items ni ON e.news_id = ni.id
+            WHERE e.status = 'closed'
+            ORDER BY e.exit_time DESC
+            LIMIT %s
+        """, (limit,))
+
+        history = cur.fetchall()
+        result = [dict(row) for row in history]
+
+        cur.close()
+        conn.close()
+
+        return json.loads(json.dumps(result, default=decimal_to_float))
+
+    except Exception as e:
+        logger.error(f"Error getting portfolio history: {e}")
+        cur.close()
+        conn.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/signals/with-reasoning")
 async def get_signals_with_reasoning(limit: int = 50):
     """
@@ -442,6 +501,31 @@ async def get_wave_analysis():
         cur.close()
         conn.close()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/market/current-prices")
+async def get_current_prices(tickers: str):
+    """Get current prices for tickers (comma-separated)"""
+    import requests
+
+    ticker_list = [t.strip() for t in tickers.split(',')]
+    FINNHUB_API_KEY = os.getenv('FINNHUB_API_KEY', 'd367tv1r01qumnp4iltgd367tv1r01qumnp4ilu0')
+
+    prices = {}
+    for ticker in ticker_list:
+        try:
+            response = requests.get(
+                f'https://finnhub.io/api/v1/quote?symbol={ticker}&token={FINNHUB_API_KEY}',
+                timeout=5
+            )
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('c'):  # current price
+                    prices[ticker] = data['c']
+        except Exception as e:
+            logger.error(f"Error getting price for {ticker}: {e}")
+            continue
+
+    return prices
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
