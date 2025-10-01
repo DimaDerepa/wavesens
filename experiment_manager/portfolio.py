@@ -8,6 +8,7 @@ import psycopg2.extras
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Tuple
+from market_timing import calculate_adjusted_max_hold, get_market_status_message
 
 logger = logging.getLogger(__name__)
 
@@ -267,8 +268,25 @@ class PortfolioManager:
             stop_loss_price = execution_price * (1 - self.config.DEFAULT_STOP_LOSS_PERCENT / 100)
             take_profit_price = execution_price * (1 + self.config.DEFAULT_TAKE_PROFIT_PERCENT / 100)
 
-            # Максимальное время удержания
-            max_hold_until = datetime.now(timezone.utc) + timedelta(hours=signal_data.get('max_hold_hours', 6))
+            # Максимальное время удержания с учетом часов работы рынка
+            desired_hold_duration = timedelta(hours=signal_data.get('max_hold_hours', 6))
+            entry_time = datetime.now(timezone.utc)
+
+            max_hold_until, adjust_reason = calculate_adjusted_max_hold(
+                entry_time,
+                desired_hold_duration,
+                min_hold_duration=timedelta(hours=2)
+            )
+
+            # Если недостаточно времени до закрытия рынка - не открываем позицию
+            if max_hold_until is None:
+                logger.warning(f"Position opening rejected: {adjust_reason}")
+                logger.warning(f"Market status: {get_market_status_message()}")
+                return None
+
+            # Логируем корректировку если была
+            if "Adjusted" in adjust_reason:
+                logger.info(f"Hold time adjusted: {adjust_reason}")
 
             # Создаем эксперимент
             cursor = self.conn.cursor()

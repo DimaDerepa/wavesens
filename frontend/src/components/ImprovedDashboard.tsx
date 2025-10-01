@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { Card } from './Card';
 import { MetricCard } from './MetricCard';
 import { ActivePositions } from './ActivePositions';
+import { PortfolioHistory } from './PortfolioHistory';
 import { SignalsWithReasoning } from './SignalsWithReasoning';
 import { ServiceLogs } from './ServiceLogs';
 import { ElliottWaveChart } from './ElliottWaveChart';
@@ -14,7 +15,7 @@ const ImprovedDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [portfolioData, setPortfolioData] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'positions' | 'signals' | 'logs'>('positions');
+  const [activeTab, setActiveTab] = useState<'positions' | 'history' | 'signals' | 'logs'>('positions');
 
   useEffect(() => {
     loadDashboardData();
@@ -224,6 +225,24 @@ const ImprovedDashboard: React.FC = () => {
               📊 Active Positions
             </button>
             <button
+              onClick={() => setActiveTab('history')}
+              style={{
+                padding: '1rem 2rem',
+                fontSize: '0.9375rem',
+                fontWeight: '600',
+                border: 'none',
+                borderBottom: activeTab === 'history' ? '3px solid #38bdf8' : '3px solid transparent',
+                marginBottom: '-2px',
+                cursor: 'pointer',
+                backgroundColor: activeTab === 'history' ? 'rgba(56, 189, 248, 0.1)' : 'transparent',
+                color: activeTab === 'history' ? '#38bdf8' : '#64748b',
+                transition: 'all 0.2s',
+                borderRadius: '8px 8px 0 0'
+              }}
+            >
+              📜 History
+            </button>
+            <button
               onClick={() => setActiveTab('signals')}
               style={{
                 padding: '1rem 2rem',
@@ -265,6 +284,9 @@ const ImprovedDashboard: React.FC = () => {
           <div>
             {activeTab === 'positions' && (
               <ActivePositions apiBaseUrl={API_BASE_URL} />
+            )}
+            {activeTab === 'history' && (
+              <PortfolioHistory apiBaseUrl={API_BASE_URL} />
             )}
             {activeTab === 'signals' && (
               <SignalsWithReasoning apiBaseUrl={API_BASE_URL} />

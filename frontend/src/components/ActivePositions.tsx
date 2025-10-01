@@ -26,11 +26,12 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
   const [expandedPosition, setExpandedPosition] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [marketClosed, setMarketClosed] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
   const itemsPerPage = 5;
 
   useEffect(() => {
     loadPositions();
-    const interval = setInterval(loadPositions, 30000); // Update every 30s
+    const interval = setInterval(loadPositions, 5000); // Update every 5 seconds
     return () => clearInterval(interval);
   }, [apiBaseUrl]);
 
@@ -40,6 +41,7 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
       const data = await response.json();
       setPositions(data);
       setLoading(false);
+      setLastUpdate(new Date());
 
       // Load current prices for all tickers
       if (data.length > 0) {
@@ -130,19 +132,32 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
       title={
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
           <span>Active Positions ({positions.length})</span>
-          {marketClosed && (
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             <div style={{
               padding: '0.5rem 1rem',
-              backgroundColor: 'rgba(239, 68, 68, 0.2)',
-              border: '1px solid rgba(239, 68, 68, 0.3)',
+              backgroundColor: 'rgba(56, 189, 248, 0.1)',
+              border: '1px solid rgba(56, 189, 248, 0.3)',
               borderRadius: '0.5rem',
-              color: '#fca5a5',
-              fontSize: '0.875rem',
+              color: '#38bdf8',
+              fontSize: '0.75rem',
               fontWeight: '600'
             }}>
-              🕒 Market Closed - Showing Last Prices
+              🔄 Updated: {lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </div>
-          )}
+            {marketClosed && (
+              <div style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '0.5rem',
+                color: '#fca5a5',
+                fontSize: '0.875rem',
+                fontWeight: '600'
+              }}>
+                🕒 Market Closed
+              </div>
+            )}
+          </div>
         </div>
       }
       loading={loading}
