@@ -22,9 +22,22 @@ class MarketDataProvider:
         self.yahoo_rate_limit_delay = 3.0  # 3 секунды между запросами
         self.yahoo_blocked = False  # Флаг блокировки Yahoo
         self.yahoo_block_until = 0  # Время до которого не пытаться Yahoo
+        self.ticker_blacklist = {}  # {ticker: timestamp} - тикеры которые не работают
+        self.blacklist_ttl = 3600  # 1 час - не пытаться загружать blacklisted тикеры
 
     def get_current_price(self, ticker: str, allow_stale=False) -> Optional[float]:
         """Получает текущую цену тикера с умным fallback"""
+        # Проверяем blacklist
+        if ticker in self.ticker_blacklist:
+            blacklist_age = time.time() - self.ticker_blacklist[ticker]
+            if blacklist_age < self.blacklist_ttl:
+                logger.debug(f"Ticker {ticker} is blacklisted (age: {blacklist_age/60:.1f}m)")
+                return None
+            else:
+                # Blacklist expired, remove from blacklist and try again
+                logger.info(f"Removing {ticker} from blacklist (expired)")
+                del self.ticker_blacklist[ticker]
+
         # Проверяем свежий кеш
         cached_data = self.price_cache.get(ticker)
         if cached_data:
@@ -70,7 +83,9 @@ class MarketDataProvider:
             }
             logger.info(f"✅ Got price for {ticker}: ${price:.2f}")
         else:
-            logger.error(f"❌ Failed to get price for {ticker} from all sources")
+            # Добавляем в blacklist если все источники не работают
+            self.ticker_blacklist[ticker] = time.time()
+            logger.warning(f"❌ Failed to get price for {ticker} from all sources - added to blacklist for {self.blacklist_ttl/60:.0f}min")
 
         return price
 
@@ -85,10 +100,15 @@ class MarketDataProvider:
 
             self.last_yahoo_request = time.time()
 
-            # Отключаем debug логи yfinance временно
+            # Полностью отключаем все логи yfinance (включая stdout/stderr)
             yf_logger = logging.getLogger('yfinance')
             original_level = yf_logger.level
-            yf_logger.setLevel(logging.ERROR)
+            yf_logger.setLevel(logging.CRITICAL)  # Только критические ошибки
+
+            # Также подавляем urllib3 логи
+            urllib3_logger = logging.getLogger('urllib3')
+            urllib3_original = urllib3_logger.level
+            urllib3_logger.setLevel(logging.CRITICAL)
 
             try:
                 stock = yf.Ticker(ticker)
@@ -105,13 +125,16 @@ class MarketDataProvider:
                 return float(latest_price)
             finally:
                 yf_logger.setLevel(original_level)
+                urllib3_logger.setLevel(urllib3_original)
 
         except Exception as e:
             self._last_yahoo_error = str(e)
             if '429' in str(e) or 'Too Many Requests' in str(e):
-                logger.warning(f"Yahoo Finance 429 for {ticker}")
+                logger.debug(f"Yahoo Finance 429 for {ticker}")
             else:
-                logger.warning(f"Yahoo Finance error for {ticker}: {e}")
+                # Только логируем если это не "delisted" ошибка
+                if 'delisted' not in str(e).lower() and 'no price data' not in str(e).lower():
+                    logger.debug(f"Yahoo Finance error for {ticker}: {e}")
             return None
 
     def _get_price_finnhub(self, ticker: str) -> Optional[float]:
