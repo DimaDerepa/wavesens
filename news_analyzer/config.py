@@ -16,7 +16,7 @@ class Config:
     CHECK_INTERVAL_SECONDS = int(os.getenv('CHECK_INTERVAL_SECONDS', '5'))
     SKIP_NEWS_OLDER_HOURS = int(os.getenv('SKIP_NEWS_OLDER_HOURS', '24'))
     MAX_NEWS_PER_CHECK = int(os.getenv('MAX_NEWS_PER_CHECK', '20'))
-    LLM_MODEL = os.getenv('LLM_MODEL', 'anthropic/claude-3-haiku')
+    LLM_MODEL = os.getenv('LLM_MODEL', 'anthropic/claude-3.7-sonnet')  # Upgraded for better news analysis
     LLM_TEMPERATURE = float(os.getenv('LLM_TEMPERATURE', '0.3'))
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO')
 

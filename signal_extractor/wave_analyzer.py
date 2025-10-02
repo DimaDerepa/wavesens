@@ -26,22 +26,35 @@ class WaveAnalysisSignature(dspy.Signature):
     market_impact = dspy.OutputField(desc="Ожидаемое влияние на рынок: high/medium/low")
 
 class SignalGenerationSignature(dspy.Signature):
-    """Генерация торговых сигналов для оптимальной волны"""
+    """Generate trading signals for optimal Elliott Wave with deep market analysis.
+
+    CRITICAL INSTRUCTIONS:
+    1. Analyze both BULLISH and BEARISH implications of the news
+    2. Use SHORT signals when news is NEGATIVE for a company/sector
+    3. Use BUY signals when news is POSITIVE for a company/sector
+    4. Consider:
+       - Direct impact on mentioned companies
+       - Indirect impact on competitors/suppliers
+       - Sector-wide effects
+       - Market sentiment shifts
+    5. Be selective - only high-conviction trades with clear rationale
+    6. Confidence should reflect realistic probabilities (40-80% typical range)
+    """
 
     # Входные данные
-    headline = dspy.InputField(desc="Заголовок новости")
-    summary = dspy.InputField(desc="Краткое содержание новости")
-    optimal_wave = dspy.InputField(desc="Номер оптимальной волны")
-    wave_start_minutes = dspy.InputField(desc="Начало волны в минутах от сейчас")
-    wave_end_minutes = dspy.InputField(desc="Конец волны в минутах от сейчас")
-    news_type = dspy.InputField(desc="Тип новости")
+    headline = dspy.InputField(desc="News headline")
+    summary = dspy.InputField(desc="News summary with key details")
+    optimal_wave = dspy.InputField(desc="Optimal Elliott Wave number (0-6)")
+    wave_start_minutes = dspy.InputField(desc="Wave start in minutes from now")
+    wave_end_minutes = dspy.InputField(desc="Wave end in minutes from now")
+    news_type = dspy.InputField(desc="News type: earnings/macro/regulatory/tech/crypto/other")
 
     # Выходные данные
-    tickers = dspy.OutputField(desc="Список тикеров через запятую (максимум 5)")
-    actions = dspy.OutputField(desc="Действия для каждого тикера: BUY или SHORT через запятую")
-    expected_moves = dspy.OutputField(desc="Ожидаемое движение в процентах для каждого тикера через запятую")
-    confidences = dspy.OutputField(desc="Уверенность 0-100% для каждого тикера через запятую")
-    reasoning = dspy.OutputField(desc="Обоснование выбора тикеров и направлений")
+    tickers = dspy.OutputField(desc="List of stock tickers comma-separated (max 5, US markets only)")
+    actions = dspy.OutputField(desc="Actions: BUY for positive impact, SHORT for negative impact, comma-separated. MUST analyze both directions.")
+    expected_moves = dspy.OutputField(desc="Expected price moves in percent (absolute values, e.g. 2.5, 3.0), comma-separated")
+    confidences = dspy.OutputField(desc="Confidence 0-100 for each trade (realistic: 40-80), comma-separated as integers")
+    reasoning = dspy.OutputField(desc="Detailed reasoning for each ticker: why this direction, what catalysts, what risks")
 
 class WaveAnalyzer:
     def __init__(self, openrouter_api_key, model_name, temperature, max_tokens, timeout):

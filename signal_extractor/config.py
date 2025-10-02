@@ -10,10 +10,10 @@ class Config:
     OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
     DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://localhost/news_analyzer')
 
-    # LLM настройки
-    LLM_MODEL = os.getenv('LLM_MODEL', 'anthropic/claude-3-haiku')
-    LLM_TEMPERATURE = float(os.getenv('LLM_TEMPERATURE', '0.4'))
-    LLM_MAX_TOKENS = int(os.getenv('LLM_MAX_TOKENS', '2000'))
+    # LLM настройки - upgraded to Claude 3.7 Sonnet for better analysis
+    LLM_MODEL = os.getenv('LLM_MODEL', 'anthropic/claude-3.7-sonnet')
+    LLM_TEMPERATURE = float(os.getenv('LLM_TEMPERATURE', '0.3'))  # Lower for more focused analysis
+    LLM_MAX_TOKENS = int(os.getenv('LLM_MAX_TOKENS', '4000'))  # More tokens for detailed reasoning
     LLM_TIMEOUT_SECONDS = int(os.getenv('LLM_TIMEOUT_SECONDS', '30'))
 
     # Параметры сигналов

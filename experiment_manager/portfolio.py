@@ -264,9 +264,23 @@ class PortfolioManager:
             commission = self.config.calculate_commission(position_size)
             total_cost = position_size + commission
 
+            # IMPROVED: Dynamic stop loss/take profit based on confidence and expected move
+            # Higher confidence = wider stops, lower confidence = tighter stops
+            confidence = float(signal_data.get('confidence', 50))
+            expected_move = float(signal_data.get('expected_move', 3.0))
+
+            # Dynamic stop loss: 2-4% based on confidence (lower confidence = tighter stop)
+            stop_loss_percent = 2.0 + (confidence / 100.0) * 2.0  # 2-4%
+
+            # Dynamic take profit: aim for 1.5x expected move, capped at 8%
+            take_profit_percent = min(expected_move * 1.5, 8.0)
+
             # Рассчитываем уровни stop loss и take profit
-            stop_loss_price = execution_price * (1 - self.config.DEFAULT_STOP_LOSS_PERCENT / 100)
-            take_profit_price = execution_price * (1 + self.config.DEFAULT_TAKE_PROFIT_PERCENT / 100)
+            stop_loss_price = execution_price * (1 - stop_loss_percent / 100)
+            take_profit_price = execution_price * (1 + take_profit_percent / 100)
+
+            logger.info(f"  Dynamic SL/TP: confidence={confidence:.0f}%, expected_move={expected_move:.1f}%")
+            logger.info(f"  Stop Loss: {stop_loss_percent:.2f}%, Take Profit: {take_profit_percent:.2f}%")
 
             # Максимальное время удержания с учетом часов работы рынка
             desired_hold_duration = timedelta(hours=signal_data.get('max_hold_hours', 6))
@@ -517,12 +531,13 @@ class PortfolioManager:
         try:
             cursor = self.conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-            # Позиции с превышением времени удержания
-            # Упрощенная версия без связи с signals
+            # Позиции с РЕАЛЬНЫМ превышением времени удержания
+            # FIXED: check actual max_hold_until expiration, not all positions
             cursor.execute("""
                 SELECT *
                 FROM experiments
                 WHERE status = 'active'
+                AND max_hold_until < NOW()
             """)
             time_expired = cursor.fetchall()
 
