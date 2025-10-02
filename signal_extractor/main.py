@@ -333,6 +333,12 @@ class SignalExtractorService:
                 wave = wave_analysis['optimal_wave']
                 wave_timing = self._calculate_entry_timing(wave)
 
+                # Calculate max_hold based on wave
+                wave_intervals = self.config.WAVE_INTERVALS
+                start_min, end_min = wave_intervals.get(wave, (0, 1440))
+                max_hold_minutes = end_min - start_min
+                max_hold_hours = max(max_hold_minutes / 60, 0.5)  # Минимум 30 минут
+
                 cursor.execute("""
                     INSERT INTO trading_signals (
                         news_item_id, signal_type, confidence, elliott_wave,
@@ -341,7 +347,7 @@ class SignalExtractorService:
                 """, (
                     news_id,
                     signal['action'],  # BUY/SELL/HOLD
-                    signal['confidence'] / 100.0,  # Convert to 0-1 range
+                    signal['confidence'],  # Already 0-100, store as-is
                     wave,
                     f"Wave {wave} - {signal.get('wave_description', 'Elliott Wave analysis')}",
                     signal['reasoning'],
@@ -350,7 +356,7 @@ class SignalExtractorService:
                         'expected_move': signal.get('expected_move', 0),
                         'stop_loss_percent': self.config.DEFAULT_STOP_LOSS_PERCENT,
                         'take_profit_percent': self.config.DEFAULT_TAKE_PROFIT_PERCENT,
-                        'max_hold_hours': self.config.DEFAULT_MAX_HOLD_HOURS,
+                        'max_hold_hours': max_hold_hours,  # Dynamic based on wave
                         'ticker_validated': signal.get('ticker_validated', True),
                         'ticker_exists': signal.get('ticker_exists', True)
                     })

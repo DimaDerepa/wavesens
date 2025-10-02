@@ -368,6 +368,14 @@ class ExperimentManagerService:
             unrealized_pnl = current_value - position_size
             unrealized_percent = (unrealized_pnl / position_size) * 100 if position_size > 0 else 0
 
+            # Update current_price in database
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                UPDATE experiments
+                SET current_price = %s
+                WHERE id = %s
+            """, (current_price, position['id']))
+
             logger.debug(f"Position update: {position['ticker']}")
             logger.debug(f"  Current price: ${current_price:.2f}")
             logger.debug(f"  Unrealized P&L: ${unrealized_pnl:+.2f} ({unrealized_percent:+.2f}%)")
