@@ -236,7 +236,7 @@ class ExperimentManagerService:
                 'entry_optimal': created_at + timedelta(minutes=(start_min + end_min) / 2),
                 'entry_end': entry_end,
                 'expected_move': market_conditions.get('expected_move', 0),
-                'confidence': int(row['confidence'] * 100),  # Convert 0.8 to 80
+                'confidence': int(row['confidence']),  # Already 0-100 in DB
                 'headline': row['headline']
             }
 

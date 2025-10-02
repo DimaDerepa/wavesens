@@ -16,10 +16,10 @@ class MarketDataProvider:
         self.alpha_vantage_key = alpha_vantage_key
         self.finnhub_key = finnhub_key
         self.price_cache = {}
-        self.cache_ttl = 300  # 5 минут
-        self.stale_cache_ttl = 3600  # 1 час - используем для fallback
+        self.cache_ttl = 30  # 30 секунд - быстрое обновление для monitor
+        self.stale_cache_ttl = 300  # 5 минут - используем для fallback
         self.last_yahoo_request = 0
-        self.yahoo_rate_limit_delay = 3.0  # 3 секунды между запросами
+        self.yahoo_rate_limit_delay = 1.0  # 1 секунда между запросами (20 позиций = 20 сек)
         self.yahoo_blocked = False  # Флаг блокировки Yahoo
         self.yahoo_block_until = 0  # Время до которого не пытаться Yahoo
         self.ticker_blacklist = {}  # {ticker: timestamp} - тикеры которые не работают
