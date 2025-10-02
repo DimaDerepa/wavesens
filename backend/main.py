@@ -251,7 +251,7 @@ async def get_active_positions():
         cur.execute("""
             SELECT
                 id, ticker, signal_id, news_id,
-                entry_time, entry_price, position_size, shares,
+                entry_time, entry_price, current_price, position_size, shares,
                 stop_loss_price, take_profit_price, max_hold_until,
                 sp500_entry, commission_paid, status
             FROM experiments
