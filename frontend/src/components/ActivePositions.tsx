@@ -6,6 +6,7 @@ interface Position {
   ticker: string;
   entry_time: string;
   entry_price: number;
+  current_price?: number;  // Updated by backend every 30s
   position_size: number;
   shares: number;
   stop_loss_price: number;
@@ -39,39 +40,29 @@ export const ActivePositions: React.FC<Props> = ({ apiBaseUrl }) => {
     try {
       const response = await fetch(`${apiBaseUrl}/api/positions/active`);
       const data = await response.json();
+
+      // Use current_price from API response (already updated by backend every 30s)
+      const pricesMap: { [key: string]: number } = {};
+      let hasCurrentPrices = false;
+
+      data.forEach((position: Position) => {
+        // Use current_price if available, otherwise fallback to entry_price
+        const currentPrice = position.current_price || position.entry_price;
+        pricesMap[position.ticker] = currentPrice;
+
+        if (position.current_price && position.current_price !== position.entry_price) {
+          hasCurrentPrices = true;
+        }
+      });
+
+      setPrices(pricesMap);
+      setMarketClosed(!hasCurrentPrices);
       setPositions(data);
       setLoading(false);
       setLastUpdate(new Date());
-
-      // Load current prices for all tickers
-      if (data.length > 0) {
-        const tickers = data.map((p: Position) => p.ticker).join(',');
-        loadCurrentPrices(tickers);
-      }
     } catch (err) {
       console.error('Failed to load positions:', err);
       setLoading(false);
-    }
-  };
-
-  const loadCurrentPrices = async (tickers: string) => {
-    try {
-      const allTickers = `${tickers},SPY`; // Include SPY for S&P 500
-      const response = await fetch(`${apiBaseUrl}/api/market/current-prices?tickers=${allTickers}`);
-      const data = await response.json();
-
-      const { SPY, ...tickerPrices } = data;
-
-      // Check if market is closed (no prices or all prices are 0)
-      const priceValues = Object.values(tickerPrices) as number[];
-      const hasPrices = Object.keys(tickerPrices).length > 0 &&
-                        priceValues.some(p => p > 0);
-      setMarketClosed(!hasPrices);
-
-      setPrices(tickerPrices);
-      if (SPY) setSp500Price(SPY);
-    } catch (err) {
-      console.error('Failed to load current prices:', err);
       setMarketClosed(true);
     }
   };
