@@ -353,7 +353,7 @@ class ExperimentManagerService:
     def check_position_exit_conditions(self, position):
         """Проверяет условия выхода для позиции"""
         try:
-            current_price = self.market_data.get_current_price(position['ticker'])
+            current_price = self.market_data.get_current_price(position['ticker'], allow_stale=True)
             if not current_price:
                 logger.warning(f"Could not get current price for {position['ticker']}")
                 return
